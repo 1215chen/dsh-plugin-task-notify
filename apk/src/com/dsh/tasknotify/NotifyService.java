@@ -12,6 +12,10 @@ import android.os.IBinder;
 import android.os.PowerManager;
 import android.util.Log;
 
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 import javax.net.ssl.SSLSocketFactory;
 
 /**
@@ -20,6 +24,8 @@ import javax.net.ssl.SSLSocketFactory;
  */
 public final class NotifyService extends Service implements NotifySink {
     private static final String TAG = "DSHNotify";
+    private static final long DEDUPE_WINDOW_MS = 10 * 60 * 1000L;
+    private static final int DEDUPE_LIMIT = 256;
     private static volatile NotifyService instance;
     private static volatile boolean running;
     private static volatile String lastError = "";
@@ -30,6 +36,7 @@ public final class NotifyService extends Service implements NotifySink {
     private NotifyHttpServer httpServer;
     private DiscoveryServer discoveryServer;
     private CloudClient cloudClient;
+    private final Map<String, Long> recentDeliveries = new LinkedHashMap<>();
     private volatile String serviceText = "正在启动接收服务…";
     private PowerManager.WakeLock wakeLock;
     private WifiManager.MulticastLock multicastLock;
@@ -109,6 +116,27 @@ public final class NotifyService extends Service implements NotifySink {
 
     @Override
     public void deliver(NotifyPayload payload) {
+        String key = payload.id == null ? "" : payload.id.trim();
+        if (key.isEmpty()) key = payload.status + "|" + payload.title + "|" + payload.ts;
+        long now = System.currentTimeMillis();
+        synchronized (recentDeliveries) {
+            Iterator<Map.Entry<String, Long>> iterator = recentDeliveries.entrySet().iterator();
+            while (iterator.hasNext()) {
+                if (now - iterator.next().getValue() > DEDUPE_WINDOW_MS) iterator.remove();
+            }
+            if (recentDeliveries.containsKey(key)) {
+                Log.i(TAG, "duplicate " + payload.id + " ignored");
+                return;
+            }
+            recentDeliveries.put(key, now);
+            while (recentDeliveries.size() > DEDUPE_LIMIT) {
+                Iterator<String> oldest = recentDeliveries.keySet().iterator();
+                if (oldest.hasNext()) {
+                    oldest.next();
+                    oldest.remove();
+                }
+            }
+        }
         NotificationHelper.notifyTask(this, payload);
         Store.get(this).addHistory(payload);
         broadcastEvent("notification");

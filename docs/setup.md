@@ -228,7 +228,7 @@ Profile 的 `package.json`：
 ### 3.1 安装
 
 ```powershell
-adb install -r release\DSH-Task-Notify-1.2.0.apk
+adb install -r release\DSH-Task-Notify-1.2.1.apk
 ```
 
 允许通知权限；vivo/iQOO 还要设置：

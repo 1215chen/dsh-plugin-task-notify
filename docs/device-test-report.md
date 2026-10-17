@@ -2,8 +2,8 @@
 
 日期：2026-10-17  
 设备：vivo V2154A（PD2154），Android 14 / API 34  
-APK：`DSH-Task-Notify-1.2.0.apk`（versionCode 3，versionName 1.2.0，云端 + 授权通知）  
-说明：网络/通知链路最初在 1.0.0 上验证；1.2.0 增加云端 SSE、自签名 CA、授权通知和 DSH 鲸鱼图标。
+APK：`DSH-Task-Notify-1.2.1.apk`（versionCode 4，versionName 1.2.1，云端 + 授权通知）  
+说明：网络/通知链路最初在 1.0.0 上验证；1.2.1 增加云端 SSE、自签名 CA、授权通知和 DSH 鲸鱼图标。
 电脑：Windows，WLAN `Miwifi`，`192.168.1.100`  
 手机：`Miwifi`，`192.168.1.23`（测试中曾自动切到 `huawei-super-wifi-5G` → `192.168.1.24`）
 
@@ -11,7 +11,7 @@ APK：`DSH-Task-Notify-1.2.0.apk`（versionCode 3，versionName 1.2.0，云端 +
 
 | # | 测试 | 结果 | 证据 |
 |---|---|---|---|
-| 1 | ADB 安装 APK | 通过 | `dumpsys package` versionName 1.2.0 |
+| 1 | ADB 安装 APK | 通过 | `dumpsys package` versionName 1.2.1 |
 | 2 | 打开 App，前台服务启动 | 通过 | `dumpsys activity services`：`isForeground=true`，type `dataSync` |
 | 3 | 通知权限 / 渠道 | 通过 | `POST_NOTIFICATIONS: granted=true`；渠道 `task_done` importance=4，声音/震动已配置 |
 | 4 | `GET /ping`（电脑 → 手机） | 通过 | `HTTP 200 {"ok":true,"name":"V2154A","port":8765}` |
@@ -35,6 +35,7 @@ APK：`DSH-Task-Notify-1.2.0.apk`（versionCode 3，versionName 1.2.0，云端 +
 | 22 | 云端投递与离线队列 | 通过 | 插件 0.2.0 → 云中继 → 手机；队列 `Last-Event-ID` 补发 |
 | 23 | 授权通知 | 通过 | `approval/asked` → 「需要授权」+ 锁图标 |
 | 24 | DSH 图标 | 通过 | 自适应图标和白色鲸鱼通知小图标正常 |
+| 25 | 双通道去重 | 通过 | 同一 payload 同发局域网/云端，日志 1 次 delivered + 多次 duplicate ignored |
 
 ## 关键发现 1：vivo 会冻结前台服务
 

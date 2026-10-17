@@ -1,7 +1,7 @@
 # DSH 任务通知插件
 
 DSH 每完成一轮任务时，把通知推送到同一 Wi‑Fi 下的安卓手机。手机端配套 App 已经打包为
-`DSH-Task-Notify-1.2.0.apk`，不需要公网、账号或第三方推送服务。
+`DSH-Task-Notify-1.2.1.apk`，不需要公网、账号或第三方推送服务。
 
 - 监听 `session/event` 的正常/异常回合结束，不会把中间消息或子代理回合当作任务完成。
 - 用 UDP 广播自动发现手机，通常不需要填写 IP。
@@ -13,7 +13,7 @@ DSH 每完成一轮任务时，把通知推送到同一 Wi‑Fi 下的安卓手�
 
 ```text
 电脑端  dsh-plugin-task-notify   （本目录）
-手机端  DSH-Task-Notify-1.2.0.apk
+手机端  DSH-Task-Notify-1.2.1.apk
 ```
 
 电脑端只依赖 Node 内置模块，安装为一个普通 DSH profile bundle；手机端是原生 Android
@@ -34,7 +34,7 @@ dsh plugin --profile desktop add /absolute/path/dsh-plugin-task-notify-0.2.0.tgz
 
 ### 手机端
 
-1. 把 `DSH-Task-Notify-1.2.0.apk` 传到手机上，允许「安装未知来源应用」后安装。
+1. 把 `DSH-Task-Notify-1.2.1.apk` 传到手机上，允许「安装未知来源应用」后安装。
 2. 打开 App，允许通知权限。
 3. 保持 App 打开一次，让前台服务启动；之后可以退到后台。
 4. 点「发送测试」应能立即看到一条通知。

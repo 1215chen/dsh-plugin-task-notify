@@ -4,7 +4,7 @@
 使用 Android build-tools 直接构建。
 
 - 包名：`com.dsh.tasknotify`
-- 版本：1.2.0（versionCode 3）
+- 版本：1.2.1（versionCode 4）
 - minSdk 26 / targetSdk 34
 - APK 约 260 KB
 - 界面：深色原生界面，支持局域网直连和云端中继
@@ -52,12 +52,13 @@ apk/
 
 ### 界面与云端
 
-v1.2.0 仍然是原生实现，没有 AndroidX / Material Components 依赖：
+v1.2.1 仍然是原生实现，没有 AndroidX / Material Components 依赖：
 
 - 深色界面，底部导航切换「通知 / 设置」。
 - **通知页只保留状态卡 + 历史**；启动停止、发送测试、电池优化、清空、保存全部在设置页。
 - 设置页新增「云端中继」：服务器地址、设备 ID、令牌、启用开关。
 - 云端使用 SSE 长连接；断线自动重连，服务端按 `Last-Event-ID` 补发离线队列。
+- 双通道去重：`NotifyService` 按 `payload.id` 在 10 分钟窗口内只处理第一条，避免局域网 + 云端重复通知。
 - `CloudClient` 是纯 Java，桌面 JVM 可直接测试；`CloudTls` 只信任内置 CA。
 - 授权事件 `approval/asked` 显示为「需要授权」，历史里使用锁图标和琥珀色。
 - 应用图标来自 DSH 桌面端的鲸鱼；通知栏小图标为白色鲸鱼剪影。

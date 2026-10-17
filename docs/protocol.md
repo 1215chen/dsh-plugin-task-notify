@@ -40,7 +40,7 @@
   "name": "我的手机",
   "model": "Xiaomi 14",
   "port": 8765,
-  "version": "1.2.0",
+  "version": "1.2.1",
   "time": 1792210832473
 }
 ```
@@ -72,7 +72,7 @@ X-Content-Type-Options: nosniff
 {
   "ok": true,
   "app": "dsh-task-notify",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "name": "我的手机",
   "port": 8765,
   "time": 1792210832473

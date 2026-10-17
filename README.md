@@ -21,7 +21,7 @@
 
 | 文件 | 说明 |
 |---|---|
-| [`release/DSH-Task-Notify-1.2.0.apk`](release/DSH-Task-Notify-1.2.0.apk) | 安卓安装包（minSdk 26 / targetSdk 34） |
+| [`release/DSH-Task-Notify-1.2.1.apk`](release/DSH-Task-Notify-1.2.1.apk) | 安卓安装包（minSdk 26 / targetSdk 34） |
 | [`release/dsh-plugin-task-notify-0.2.0.tgz`](release/dsh-plugin-task-notify-0.2.0.tgz) | 电脑端 DSH 插件包 |
 | [`plugin/`](plugin/) | 插件源码与配置说明 |
 | [`apk/`](apk/) | 安卓 App 源码、资源、JVM 测试 |
@@ -33,11 +33,99 @@
 
 ## 快速开始
 
-1. 安装 `DSH-Task-Notify-1.2.0.apk`，允许通知权限。
+1. 安装 `DSH-Task-Notify-1.2.1.apk`，允许通知权限。
 2. 局域网模式：手机和电脑连接同一 Wi-Fi，打开「接收服务」。
 3. 云端模式：设置 → 云端中继，填写服务器地址、设备 ID、令牌并保存。
 4. 插件已经写入 DSH 的 `desktop` profile（见下节）。
 5. 之后每轮任务完成/失败，以及 DSH 弹出授权请求时，都会收到通知。
+
+## 安装教程
+
+### 1. 手机端
+
+1. 下载 [`release/DSH-Task-Notify-1.2.1.apk`](release/DSH-Task-Notify-1.2.1.apk)。
+2. 传到手机后点击安装；系统提示「未知来源」时允许当前文件管理器安装。
+   USB 调试也可用：
+
+   ```powershell
+   adb install -r release\DSH-Task-Notify-1.2.1.apk
+   ```
+
+3. 打开 App，允许通知权限。接收服务默认启动，首页状态卡会显示手机在局域网中的地址，
+   例如 `192.168.1.23:8765`。
+4. 点「发送测试通知」，确认通知栏、声音和锁屏显示正常。
+5. 建议把 App 加入电池白名单；vivo/iQOO 还必须允许「后台高耗电」，否则锁屏后服务会被冻结。
+
+### 2. 电脑端插件
+
+1. 确认 DSH 已安装并能正常启动。
+2. 安装插件包（二选一）：
+
+   ```powershell
+   dsh plugin --profile desktop add D:\path\to\dsh-plugin-task-notify-0.2.0.tgz
+   ```
+
+   或在 DSH 插件页面选择本地的 `dsh-plugin-task-notify-0.2.0.tgz`。
+
+3. 确认 profile 的 `package.json` 里有：
+
+   ```json
+   "dependencies": {
+     "dsh-plugin-task-notify": "file:vendor/dsh-plugin-task-notify-0.2.0.tgz"
+   }
+   ```
+
+   以及 `dsh.profile.bundles` 包含 `dsh-plugin-task-notify`。
+
+4. 局域网模式无需额外配置，插件会自动发现同一 Wi-Fi 下的手机。自动发现失败时，
+   在 profile 的 `cordis.patch.yml` 写死手机 IP：
+
+   ```yaml
+   - id: task-notify
+     config:
+       discover: false
+       devices:
+         - host: 192.168.1.23
+           port: 8765
+           name: 我的手机
+   ```
+
+5. 云端模式在同一个 `cordis.patch.yml` 加：
+
+   ```yaml
+   - id: task-notify
+     config:
+       cloud:
+         url: https://YOUR_SERVER_IP:56159
+         token: <TOKEN>
+         device: my-phone
+         caFile: C:/path/to/cloud-ca.pem
+   ```
+
+6. **重启 DSH**。插件只在启动时加载；重启后可在对话里说
+   **「用 phone_notify 测试一下手机通知」** 验证。
+
+### 3. 云端（可选）
+
+不配置云端时，手机和电脑在同一 Wi-Fi 即可。需要跨网络时：
+
+1. 按 [完整配置过程](docs/setup.md) 在服务器部署中继、CA 和令牌。
+2. 在 App 设置 → 云端中继填入 URL、设备 ID、令牌，保存。
+3. 在插件 `cloud` 配置里填同一个设备 ID 和令牌，重启 DSH。
+4. 首页出现「云端已连接」后，从外网触发一轮任务测试。
+
+### 4. 从源码构建 APK（可选）
+
+需要 JDK 17+、Android build-tools 34、platform android-34 和 Node 22。
+仓库不包含 `_sdk/` 与签名密钥，需自行准备：
+
+```powershell
+$env:DSH_KEYSTORE_PASSWORD = "your-keystore-password"
+.\build-apk.cmd
+```
+
+首次构建会在 `apk\keystore\` 生成本地签名密钥；该目录已被 `.gitignore` 排除，不要提交。
+APK 输出到 `release\DSH-Task-Notify-1.2.1.apk`。
 
 ## 界面
 
@@ -93,6 +181,7 @@ C:\Users\Cyhao\.dsh\profiles\desktop\
 - **vivo V2154A / Android 14 真机**：安装、前台服务、`/ping`、通知渠道、通知中心、
   点按定位历史、云端 SSE、自签名 CA 校验、授权通知、设置页开关全部实测通过。
 - 云端链路实测：插件 0.2.0 → `YOUR_SERVER_IP:56159` → 手机 SSE → 通知/历史。
+- 双通道去重：同一 `payload.id` 同时从局域网和云端到达时，10 分钟窗口内只保留一条通知和一条历史。
 - APK 已通过 `apksigner verify`（v2 + v3）、`zipalign`、`aapt2 dump badging`。
 
 ![关于](docs/screenshots/about.png)
@@ -135,7 +224,7 @@ No FCM, ntfy, account or third-party push service.
 
 | File | Description |
 |---|---|
-| [`release/DSH-Task-Notify-1.2.0.apk`](release/DSH-Task-Notify-1.2.0.apk) | Android APK (minSdk 26 / targetSdk 34) |
+| [`release/DSH-Task-Notify-1.2.1.apk`](release/DSH-Task-Notify-1.2.1.apk) | Android APK (minSdk 26 / targetSdk 34) |
 | [`release/dsh-plugin-task-notify-0.2.0.tgz`](release/dsh-plugin-task-notify-0.2.0.tgz) | DSH desktop plugin |
 | [`plugin/`](plugin/) | Plugin source and configuration |
 | [`apk/`](apk/) | Android source, resources and JVM tests |
@@ -148,11 +237,83 @@ No FCM, ntfy, account or third-party push service.
 
 ### Quick start
 
-1. Install `DSH-Task-Notify-1.2.0.apk` and grant notification permission.
+1. Install `DSH-Task-Notify-1.2.1.apk` and grant notification permission.
 2. LAN: connect the phone and desktop to the same Wi-Fi and enable the receiver.
 3. Cloud: Settings → Cloud relay, enter server URL, device ID and token, then save.
 4. The plugin is installed into the DSH `desktop` profile (see below).
 5. Notifications arrive on task completion/failure and when DSH asks for approval.
+
+### Installation
+
+#### Phone
+
+1. Download [`release/DSH-Task-Notify-1.2.1.apk`](release/DSH-Task-Notify-1.2.1.apk) and install it.
+   With ADB:
+
+   ```powershell
+   adb install -r release\DSH-Task-Notify-1.2.1.apk
+   ```
+
+2. Open the app and allow notifications. The receiver starts by default; the status card
+   shows the phone's LAN address (for example `192.168.1.23:8765`).
+3. Tap **Send test notification** and confirm sound/lock-screen display.
+4. Allow background activity. On vivo/iQOO also allow **high background power consumption**,
+   otherwise the service is frozen when the screen is off.
+
+#### Desktop plugin
+
+1. Install the plugin from the release tarball:
+
+   ```powershell
+   dsh plugin --profile desktop add D:\path\to\dsh-plugin-task-notify-0.2.0.tgz
+   ```
+
+   Or pick `dsh-plugin-task-notify-0.2.0.tgz` in the DSH plugin page.
+
+2. Ensure the profile `package.json` has
+   `dsh-plugin-task-notify: file:vendor/dsh-plugin-task-notify-0.2.0.tgz` and
+   `dsh.profile.bundles` contains `dsh-plugin-task-notify`.
+
+3. LAN works without configuration. If UDP discovery is blocked, pin the phone in
+   `cordis.patch.yml`:
+
+   ```yaml
+   - id: task-notify
+     config:
+       discover: false
+       devices:
+         - host: 192.168.1.23
+           port: 8765
+           name: My phone
+   ```
+
+4. For cloud, add:
+
+   ```yaml
+   - id: task-notify
+     config:
+       cloud:
+         url: https://YOUR_SERVER_IP:56159
+         token: <TOKEN>
+         device: my-phone
+         caFile: C:/path/to/cloud-ca.pem
+   ```
+
+5. **Restart DSH**. The plugin loads at startup. Verify with the
+   `phone_notify` tool or by triggering a task.
+
+#### Build from source (optional)
+
+JDK 17+, Android build-tools 34, platform android-34 and Node 22 are required. The
+repository does not include `_sdk/` or a signing key:
+
+```powershell
+$env:DSH_KEYSTORE_PASSWORD = "your-keystore-password"
+.\build-apk.cmd
+```
+
+The first build creates a local key under `apk\keystore\`, which is git-ignored. The APK
+is written to `release\DSH-Task-Notify-1.2.1.apk`.
 
 ### UI
 
@@ -215,6 +376,8 @@ has the old plugin loaded; restart DSH once to activate 0.2.0 (cloud + approval)
   notification channel, history deep link, cloud SSE, pinned CA, approval notification
   and settings switches all verified.
 - Cloud path verified end-to-end: plugin 0.2.0 → `YOUR_SERVER_IP:56159` → phone SSE.
+- Duplicate suppression: the same `payload.id` arriving over LAN and cloud produces only
+  one notification and one history entry within a 10-minute window.
 - APK passes `apksigner verify` (v2 + v3), `zipalign` and `aapt2 dump badging`.
 
 ### Notes

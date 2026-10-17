@@ -18,7 +18,7 @@
 
 param(
     [string]$SdkRoot = "_sdk",
-    [string]$Output = "release\DSH-Task-Notify-1.2.0.apk",
+    [string]$Output = "release\DSH-Task-Notify-1.2.1.apk",
     [string]$Keystore = "apk\keystore\dsh-task-notify.p12",
     [string]$StorePassword = $env:DSH_KEYSTORE_PASSWORD
 )
@@ -129,7 +129,7 @@ try {
             "-dname", "CN=DSH Task Notify, OU=Personal, O=DSH, L=Local, ST=Local, C=CN"
         )
     }
-    $signedRelative = "release\DSH-Task-Notify-1.2.0.apk"
+    $signedRelative = "release\DSH-Task-Notify-1.2.1.apk"
     New-Item -ItemType Directory -Force -Path "release" | Out-Null
     Invoke-Native $apksigner @(
         "sign",

@@ -2,7 +2,7 @@
 
 Push a notification to a paired Android phone when a DSH task turn ends.
 
-The companion Android app (`DSH-Task-Notify-1.2.0.apk`) runs a small LAN
+The companion Android app (`DSH-Task-Notify-1.2.1.apk`) runs a small LAN
 receiver and posts a high-priority notification. No cloud service, account or
 third-party push provider is involved.
 
