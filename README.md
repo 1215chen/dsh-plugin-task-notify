@@ -129,6 +129,7 @@ APK 输出到 `release\DSH-Task-Notify-1.2.1.apk`。
 
 ## 界面
 
+- 手机端 APP 设计依照谷歌 Material Design 3 界面设计语言。
 - **通知页**只保留运行状态、接收地址、云端连接状态和最近通知，没有操作按钮。
 - **设置页**集中所有操作：接收服务、发送测试、电池优化、后台运行设置、云端中继、
   端口/设备名/令牌、清空记录和关于。
@@ -317,6 +318,7 @@ is written to `release\DSH-Task-Notify-1.2.1.apk`.
 
 ### UI
 
+- The mobile app follows Google Material Design 3.
 - **Notifications** page: runtime status, LAN address, cloud status and recent history.
   No action buttons.
 - **Settings** page: receiver switch, test notification, battery optimization,
