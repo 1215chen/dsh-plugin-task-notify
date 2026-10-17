@@ -1,0 +1,32 @@
+services:
+  relay:
+    build: .
+    restart: unless-stopped
+    environment:
+      TOKEN: ${TOKEN:?set TOKEN in .env}
+      PORT: "8787"
+      DATA_DIR: /data
+      MAX_QUEUE: "200"
+      HEARTBEAT_MS: "20000"
+    volumes:
+      - ./data:/data
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on:
+      - relay
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN in .env}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:

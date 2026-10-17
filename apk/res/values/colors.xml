@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Material 3 dark color roles (blue seed, matching the DSH accent). -->
+    <color name="primary">#A8C7FA</color>
+    <color name="on_primary">#0A305F</color>
+    <color name="primary_container">#284777</color>
+    <color name="on_primary_container">#D6E3FF</color>
+
+    <color name="secondary">#BFC6DC</color>
+    <color name="on_secondary">#293041</color>
+    <color name="secondary_container">#3F4759</color>
+    <color name="on_secondary_container">#DBE2F9</color>
+
+    <color name="tertiary">#DDBCE0</color>
+    <color name="on_tertiary">#42274A</color>
+    <color name="tertiary_container">#5A3D62</color>
+    <color name="on_tertiary_container">#FAD8FD</color>
+
+    <color name="surface">#111318</color>
+    <color name="on_surface">#E2E2E9</color>
+    <color name="surface_variant">#44474E</color>
+    <color name="on_surface_variant">#C4C6D0</color>
+    <color name="outline">#8E9099</color>
+    <color name="outline_variant">#44474E</color>
+
+    <color name="surface_container_lowest">#0C0E13</color>
+    <color name="surface_container_low">#191C20</color>
+    <color name="surface_container">#1D2024</color>
+    <color name="surface_container_high">#282A2F</color>
+    <color name="surface_container_highest">#33353A</color>
+
+    <color name="error">#FFB4AB</color>
+    <color name="on_error">#690005</color>
+    <color name="error_container">#93000A</color>
+    <color name="on_error_container">#FFDAD6</color>
+
+    <color name="success">#7BD88F</color>
+    <color name="success_container">#1F4D2E</color>
+    <color name="on_success_container">#B9F6C7</color>
+    <color name="warning">#F5C84C</color>
+    <color name="warning_container">#4D3B00</color>
+    <color name="on_warning_container">#FFE08A</color>
+
+    <color name="white">#FFFFFF</color>
+    <color name="icon_bg">#F7F9FC</color>
+</resources>

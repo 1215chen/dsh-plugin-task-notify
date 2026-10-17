@@ -1,0 +1,15 @@
+_sdk/
+_vendor/
+_tmp/
+_backup/
+_deploy/
+_deploy_github/
+apk/build/
+apk/keystore/
+*.idsig
+*.p12
+*.jks
+*.keystore
+.env
+cloud/data/
+server-stop.txt

@@ -1,0 +1,654 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/surface"
+    android:clipToPadding="false"
+    android:fillViewport="true"
+    android:scrollbars="none">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingStart="24dp"
+        android:paddingTop="8dp"
+        android:paddingEnd="24dp"
+        android:paddingBottom="32dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="服务"
+            android:textAppearance="@style/TextAppearance.Dsh.TitleLarge" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/bg_surface_container"
+            android:clipToOutline="true"
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:id="@+id/serviceRow"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_row_ripple"
+                android:clickable="true"
+                android:focusable="true"
+                android:minHeight="76dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="20dp"
+                android:paddingTop="14dp"
+                android:paddingEnd="20dp"
+                android:paddingBottom="14dp">
+
+                <FrameLayout
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:background="@drawable/bg_icon_circle_primary">
+
+                    <ImageView
+                        android:layout_width="22dp"
+                        android:layout_height="22dp"
+                        android:layout_gravity="center"
+                        android:contentDescription="接收服务"
+                        android:src="@drawable/ic_play_circle"
+                        android:tint="@color/on_primary_container" />
+                </FrameLayout>
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="16dp"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="接收服务"
+                        android:textAppearance="@style/TextAppearance.Dsh.TitleMedium" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:text="锁屏时保持通知接收"
+                        android:textAppearance="@style/TextAppearance.Dsh.BodySmall" />
+                </LinearLayout>
+
+                <com.dsh.tasknotify.M3Switch
+                    android:id="@+id/serviceSwitch"
+                    android:layout_width="52dp"
+                    android:layout_height="48dp"
+                    android:contentDescription="接收服务开关" />
+            </LinearLayout>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginStart="76dp"
+                android:background="@color/outline_variant" />
+
+            <LinearLayout
+                android:id="@+id/btnTest"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_row_ripple"
+                android:clickable="true"
+                android:focusable="true"
+                android:minHeight="76dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="20dp"
+                android:paddingTop="14dp"
+                android:paddingEnd="20dp"
+                android:paddingBottom="14dp">
+
+                <FrameLayout
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:background="@drawable/bg_icon_circle">
+
+                    <ImageView
+                        android:layout_width="22dp"
+                        android:layout_height="22dp"
+                        android:layout_gravity="center"
+                        android:contentDescription="发送测试通知"
+                        android:src="@drawable/ic_send"
+                        android:tint="@color/on_surface_variant" />
+                </FrameLayout>
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="16dp"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="发送测试通知"
+                        android:textAppearance="@style/TextAppearance.Dsh.TitleMedium" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:text="确认权限、声音和锁屏显示"
+                        android:textAppearance="@style/TextAppearance.Dsh.BodySmall" />
+                </LinearLayout>
+
+                <ImageView
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:contentDescription="打开"
+                    android:src="@drawable/ic_chevron_right"
+                    android:tint="@color/on_surface_variant" />
+            </LinearLayout>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginStart="76dp"
+                android:background="@color/outline_variant" />
+
+            <LinearLayout
+                android:id="@+id/btnBattery"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_row_ripple"
+                android:clickable="true"
+                android:focusable="true"
+                android:minHeight="76dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="20dp"
+                android:paddingTop="14dp"
+                android:paddingEnd="20dp"
+                android:paddingBottom="14dp">
+
+                <FrameLayout
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:background="@drawable/bg_icon_circle">
+
+                    <ImageView
+                        android:layout_width="22dp"
+                        android:layout_height="22dp"
+                        android:layout_gravity="center"
+                        android:contentDescription="电池优化"
+                        android:src="@drawable/ic_battery_saver"
+                        android:tint="@color/on_surface_variant" />
+                </FrameLayout>
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="16dp"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="电池优化"
+                        android:textAppearance="@style/TextAppearance.Dsh.TitleMedium" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:text="允许应用在后台运行"
+                        android:textAppearance="@style/TextAppearance.Dsh.BodySmall" />
+                </LinearLayout>
+
+                <ImageView
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:contentDescription="打开"
+                    android:src="@drawable/ic_chevron_right"
+                    android:tint="@color/on_surface_variant" />
+            </LinearLayout>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginStart="76dp"
+                android:background="@color/outline_variant" />
+
+            <LinearLayout
+                android:id="@+id/btnGuide"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_row_ripple"
+                android:clickable="true"
+                android:focusable="true"
+                android:minHeight="76dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="20dp"
+                android:paddingTop="14dp"
+                android:paddingEnd="20dp"
+                android:paddingBottom="14dp">
+
+                <FrameLayout
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:background="@drawable/bg_icon_circle">
+
+                    <ImageView
+                        android:layout_width="22dp"
+                        android:layout_height="22dp"
+                        android:layout_gravity="center"
+                        android:contentDescription="后台运行设置"
+                        android:src="@drawable/ic_info"
+                        android:tint="@color/on_surface_variant" />
+                </FrameLayout>
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="16dp"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="后台运行设置"
+                        android:textAppearance="@style/TextAppearance.Dsh.TitleMedium" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:text="vivo / iQOO 必做项"
+                        android:textAppearance="@style/TextAppearance.Dsh.BodySmall" />
+                </LinearLayout>
+
+                <ImageView
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:contentDescription="打开"
+                    android:src="@drawable/ic_chevron_right"
+                    android:tint="@color/on_surface_variant" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="32dp"
+            android:text="云端中继"
+            android:textAppearance="@style/TextAppearance.Dsh.TitleLarge" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/bg_surface_container"
+            android:clipToOutline="true"
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:id="@+id/cloudRow"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_row_ripple"
+                android:clickable="true"
+                android:focusable="true"
+                android:minHeight="76dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="20dp"
+                android:paddingTop="14dp"
+                android:paddingEnd="20dp"
+                android:paddingBottom="14dp">
+
+                <FrameLayout
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:background="@drawable/bg_icon_circle">
+
+                    <ImageView
+                        android:layout_width="22dp"
+                        android:layout_height="22dp"
+                        android:layout_gravity="center"
+                        android:contentDescription="云端通知"
+                        android:src="@drawable/ic_cloud"
+                        android:tint="@color/on_surface_variant" />
+                </FrameLayout>
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="16dp"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="启用云端通知"
+                        android:textAppearance="@style/TextAppearance.Dsh.TitleMedium" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:text="通过自有服务器转发，跨网络可用"
+                        android:textAppearance="@style/TextAppearance.Dsh.BodySmall" />
+                </LinearLayout>
+
+                <com.dsh.tasknotify.M3Switch
+                    android:id="@+id/cloudSwitch"
+                    android:layout_width="52dp"
+                    android:layout_height="48dp"
+                    android:contentDescription="云端通知开关" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/cloudFields"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingStart="20dp"
+                android:paddingTop="16dp"
+                android:paddingEnd="20dp"
+                android:paddingBottom="20dp"
+                android:visibility="gone">
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginBottom="16dp"
+                    android:background="@color/outline_variant" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="服务器地址（https://）"
+                    android:textAppearance="@style/TextAppearance.Dsh.LabelMedium" />
+
+                <EditText
+                    android:id="@+id/cloudUrl"
+                    style="@style/Widget.Dsh.EditText"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:layout_marginTop="8dp"
+                    android:hint="https://notify.example.com"
+                    android:inputType="textUri"
+                    android:maxLength="300" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp"
+                    android:text="设备 ID"
+                    android:textAppearance="@style/TextAppearance.Dsh.LabelMedium" />
+
+                <EditText
+                    android:id="@+id/cloudDevice"
+                    style="@style/Widget.Dsh.EditText"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:layout_marginTop="8dp"
+                    android:hint="my-phone"
+                    android:inputType="text"
+                    android:maxLength="64" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp"
+                    android:text="访问令牌"
+                    android:textAppearance="@style/TextAppearance.Dsh.LabelMedium" />
+
+                <EditText
+                    android:id="@+id/cloudToken"
+                    style="@style/Widget.Dsh.EditText"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:layout_marginTop="8dp"
+                    android:hint="与服务器 TOKEN 一致"
+                    android:inputType="textPassword"
+                    android:maxLength="128" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:text="在 cloud/ 部署中继；设备 ID 和令牌需与插件一致。生产环境必须使用 HTTPS。"
+                    android:textAppearance="@style/TextAppearance.Dsh.BodySmall" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="32dp"
+            android:text="接收设置"
+            android:textAppearance="@style/TextAppearance.Dsh.TitleLarge" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/bg_surface_container"
+            android:clipToOutline="true"
+            android:orientation="vertical"
+            android:padding="20dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="监听端口"
+                android:textAppearance="@style/TextAppearance.Dsh.LabelMedium" />
+
+            <EditText
+                android:id="@+id/inputPort"
+                style="@style/Widget.Dsh.EditText"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginTop="8dp"
+                android:hint="8765"
+                android:inputType="number"
+                android:maxLength="5" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="设备名称"
+                android:textAppearance="@style/TextAppearance.Dsh.LabelMedium" />
+
+            <EditText
+                android:id="@+id/inputName"
+                style="@style/Widget.Dsh.EditText"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginTop="8dp"
+                android:hint="我的手机"
+                android:inputType="text"
+                android:maxLength="40" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="访问令牌（可选）"
+                android:textAppearance="@style/TextAppearance.Dsh.LabelMedium" />
+
+            <EditText
+                android:id="@+id/inputToken"
+                style="@style/Widget.Dsh.EditText"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginTop="8dp"
+                android:hint="留空表示不校验"
+                android:inputType="textPassword"
+                android:maxLength="128" />
+
+            <Button
+                android:id="@+id/btnSave"
+                style="@style/Widget.Dsh.Button"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:layout_marginTop="20dp"
+                android:background="@drawable/bg_button_filled"
+                android:text="保存并重启服务"
+                android:textColor="@color/on_primary" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="端口范围 1024–65535；修改端口或令牌后服务会重启。"
+                android:textAppearance="@style/TextAppearance.Dsh.BodySmall" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="32dp"
+            android:text="数据"
+            android:textAppearance="@style/TextAppearance.Dsh.TitleLarge" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/bg_surface_container"
+            android:clipToOutline="true"
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:id="@+id/btnClear"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_row_ripple"
+                android:clickable="true"
+                android:focusable="true"
+                android:minHeight="76dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="20dp"
+                android:paddingTop="14dp"
+                android:paddingEnd="20dp"
+                android:paddingBottom="14dp">
+
+                <FrameLayout
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:background="@drawable/bg_icon_circle">
+
+                    <ImageView
+                        android:layout_width="22dp"
+                        android:layout_height="22dp"
+                        android:layout_gravity="center"
+                        android:contentDescription="清空通知记录"
+                        android:src="@drawable/ic_delete"
+                        android:tint="@color/error" />
+                </FrameLayout>
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="16dp"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="清空通知记录"
+                        android:textAppearance="@style/TextAppearance.Dsh.TitleMedium" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:text="只清除这台手机上的历史"
+                        android:textAppearance="@style/TextAppearance.Dsh.BodySmall" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginStart="76dp"
+                android:background="@color/outline_variant" />
+
+            <LinearLayout
+                android:id="@+id/btnAbout"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_row_ripple"
+                android:clickable="true"
+                android:focusable="true"
+                android:minHeight="76dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="20dp"
+                android:paddingTop="14dp"
+                android:paddingEnd="20dp"
+                android:paddingBottom="14dp">
+
+                <FrameLayout
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:background="@drawable/bg_icon_circle">
+
+                    <ImageView
+                        android:layout_width="22dp"
+                        android:layout_height="22dp"
+                        android:layout_gravity="center"
+                        android:contentDescription="关于"
+                        android:src="@drawable/ic_info"
+                        android:tint="@color/on_surface_variant" />
+                </FrameLayout>
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="16dp"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="关于"
+                        android:textAppearance="@style/TextAppearance.Dsh.TitleMedium" />
+
+                    <TextView
+                        android:id="@+id/aboutVersion"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:text="v1.2.0"
+                        android:textAppearance="@style/TextAppearance.Dsh.BodySmall" />
+                </LinearLayout>
+
+                <ImageView
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:contentDescription="打开"
+                    android:src="@drawable/ic_chevron_right"
+                    android:tint="@color/on_surface_variant" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:text="支持局域网直连和云端中继；启用云端后，通知也会经自有服务器转发。"
+            android:textAppearance="@style/TextAppearance.Dsh.BodySmall" />
+    </LinearLayout>
+</ScrollView>

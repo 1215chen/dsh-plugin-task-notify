@@ -1,0 +1,10 @@
+{$DOMAIN} {
+	reverse_proxy relay:8787 {
+		# Required for Server-Sent Events: do not buffer the stream.
+		flush_interval -1
+	}
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+	}
+}

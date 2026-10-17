@@ -1,0 +1,5 @@
+# Insert the host-side phone notification bridge. Configuration belongs in the
+# profile's own cordis.patch.yml, targeting the `task-notify` entry id.
+- insert:
+    - id: task-notify
+      name: dsh-plugin-task-notify

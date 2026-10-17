@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/surface"
+    android:orientation="vertical">
+
+    <LinearLayout
+        android:id="@+id/topBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingStart="24dp"
+        android:paddingTop="20dp"
+        android:paddingEnd="24dp"
+        android:paddingBottom="8dp">
+
+        <TextView
+            android:id="@+id/topEyebrow"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="DSH 任务通知"
+            android:textAppearance="@style/TextAppearance.Dsh.LabelMedium"
+            android:textColor="@color/primary" />
+
+        <TextView
+            android:id="@+id/topTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:text="通知"
+            android:textAppearance="@style/TextAppearance.Dsh.DisplaySmall" />
+
+        <TextView
+            android:id="@+id/topSubtitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="任务完成或需要授权时，静默推送到这台手机"
+            android:textAppearance="@style/TextAppearance.Dsh.BodyMedium" />
+    </LinearLayout>
+
+    <FrameLayout
+        android:id="@+id/pageHost"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <include
+            android:id="@+id/homePage"
+            layout="@layout/page_home" />
+
+        <include
+            android:id="@+id/settingsPage"
+            layout="@layout/page_settings"
+            android:visibility="gone" />
+    </FrameLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/outline_variant" />
+
+    <LinearLayout
+        android:id="@+id/bottomNav"
+        android:layout_width="match_parent"
+        android:layout_height="80dp"
+        android:background="@drawable/bg_nav_bar"
+        android:orientation="horizontal"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp">
+
+        <LinearLayout
+            android:id="@+id/navHome"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="@drawable/bg_nav_ripple"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:orientation="vertical">
+
+            <FrameLayout
+                android:layout_width="64dp"
+                android:layout_height="32dp">
+
+                <View
+                    android:id="@+id/navHomePill"
+                    android:layout_width="64dp"
+                    android:layout_height="32dp"
+                    android:background="@drawable/bg_nav_indicator" />
+
+                <ImageView
+                    android:id="@+id/navHomeIcon"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="通知"
+                    android:src="@drawable/ic_notifications"
+                    android:tint="@color/on_surface_variant" />
+            </FrameLayout>
+
+            <TextView
+                android:id="@+id/navHomeLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="通知"
+                android:textAppearance="@style/TextAppearance.Dsh.LabelMedium"
+                android:textColor="@color/on_surface_variant" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/navSettings"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="@drawable/bg_nav_ripple"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:orientation="vertical">
+
+            <FrameLayout
+                android:layout_width="64dp"
+                android:layout_height="32dp">
+
+                <View
+                    android:id="@+id/navSettingsPill"
+                    android:layout_width="64dp"
+                    android:layout_height="32dp"
+                    android:background="@drawable/bg_nav_indicator"
+                    android:visibility="invisible" />
+
+                <ImageView
+                    android:id="@+id/navSettingsIcon"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="设置"
+                    android:src="@drawable/ic_settings"
+                    android:tint="@color/on_surface_variant" />
+            </FrameLayout>
+
+            <TextView
+                android:id="@+id/navSettingsLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="设置"
+                android:textAppearance="@style/TextAppearance.Dsh.LabelMedium"
+                android:textColor="@color/on_surface_variant" />
+        </LinearLayout>
+    </LinearLayout>
+</LinearLayout>

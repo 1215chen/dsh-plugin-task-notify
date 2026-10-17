@@ -1,0 +1,16 @@
+{
+  "name": "dsh-task-notify-relay",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Self-hosted SSE relay for DSH task notifications",
+  "main": "server.mjs",
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "license": "MIT"
+}

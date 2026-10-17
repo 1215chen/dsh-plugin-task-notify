@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">DSH 任务通知</string>
+    <string name="channel_task">任务通知</string>
+    <string name="channel_task_description">DSH 任务完成、失败或需要你时推送的通知</string>
+    <string name="channel_service">常驻服务</string>
+    <string name="channel_service_description">保持手机通知接收服务运行</string>
+</resources>
