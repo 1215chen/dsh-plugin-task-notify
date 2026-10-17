@@ -191,7 +191,7 @@ Profile 的 `package.json`：
       url: https://YOUR_SERVER_IP:56159
       token: <TOKEN>
       device: vivo-v2154a
-      caFile: C:/dsh/cloud-ca.pem
+      caFile: C:/path/to/cloud-ca.pem
       timeoutMs: 8000
 ```
 

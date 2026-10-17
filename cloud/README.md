@@ -28,7 +28,7 @@ DSH 插件 ── HTTPS POST /api/v1/notify ──► 云服务器 :56159
 | 数据目录 | `/var/lib/dsh-notify`（状态文件仅 root/服务用户可读） |
 | 证书 | 自签名 CA，服务器证书 SAN 为 IP `YOUR_SERVER_IP` |
 | CA 文件 | 本地 `cloud/certs/ca.pem`；服务器 `/opt/dsh-notify/tls/ca.pem` |
-| 插件 CA | `C:/dsh/cloud-ca.pem`（插件配置 `cloud.caFile`） |
+| 插件 CA | `C:/path/to/cloud-ca.pem`（插件配置 `cloud.caFile`） |
 | App | 内置 `res/raw/dsh_cloud_ca.pem`，只信任这张 CA |
 
 Token 不写进仓库文档。服务器上查看：
@@ -90,7 +90,7 @@ NAT 映射必须保持 **外网 56159 → 内网 56159**。
       url: https://YOUR_SERVER_IP:56159
       token: <TOKEN>
       device: vivo-v2154a
-      caFile: C:/dsh/cloud-ca.pem
+      caFile: C:/path/to/cloud-ca.pem
       timeoutMs: 8000
 ```
 

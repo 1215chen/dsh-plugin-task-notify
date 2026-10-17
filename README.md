@@ -152,7 +152,7 @@ https://YOUR_SERVER_IP:56159
 插件已经写入：
 
 ```text
-C:\Users\Cyhao\.dsh\profiles\desktop\
+%USERPROFILE%\.dsh\profiles\desktop\
   package.json                  dsh-plugin-task-notify: file:vendor/dsh-plugin-task-notify-0.2.0.tgz
   vendor\dsh-plugin-task-notify-0.2.0.tgz
   node_modules\dsh-plugin-task-notify\
@@ -348,7 +348,7 @@ operations, tokens and adding another phone. No domain or ports 80/443 are requi
 ### Plugin installation
 
 ```text
-C:\Users\Cyhao\.dsh\profiles\desktop\
+%USERPROFILE%\.dsh\profiles\desktop\
   package.json                  dsh-plugin-task-notify: file:vendor/dsh-plugin-task-notify-0.2.0.tgz
   vendor\dsh-plugin-task-notify-0.2.0.tgz
   node_modules\dsh-plugin-task-notify\

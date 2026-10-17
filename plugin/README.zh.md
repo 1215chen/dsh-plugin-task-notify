@@ -89,7 +89,7 @@ dsh plugin --profile desktop add /absolute/path/dsh-plugin-task-notify-0.2.0.tgz
       url: https://YOUR_SERVER_IP:56159
       token: <TOKEN>           # 服务器 /etc/dsh-notify.env 的 TOKEN
       device: vivo-v2154a      # 手机 App 的同一个设备 ID
-      caFile: C:/dsh/cloud-ca.pem
+      caFile: C:/path/to/cloud-ca.pem
       timeoutMs: 8000
 ```
 
