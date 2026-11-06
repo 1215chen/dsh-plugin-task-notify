@@ -29,6 +29,7 @@ function makeContext() {
     ctx: {
       on: (event, handler, options) => { listener.handler = handler; listener.options = options; },
       get: (name) => services.get(name),
+      inject: () => {},
       effect: (fn) => { const dispose = fn(); if (typeof dispose === 'function') disposers.push(dispose); return () => {}; },
       logger: { info: () => {}, warn: () => {}, error: () => {} },
     },

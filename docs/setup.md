@@ -1,8 +1,7 @@
 # 完整配置过程
 
 这份文档按实际部署顺序，从一台全新 Ubuntu 24.04 云服务器开始，到手机收到局域网/云端通知为止。
-当前实例的地址是 `https://YOUR_SERVER_IP:56159`，使用 NAT 高端口和自签名证书，不需要域名、
-80 或 443。
+示例地址为 `https://YOUR_SERVER_IP:56159`，使用 NAT 高端口和自签名证书，不需要域名、80 或 443。
 
 > 不要把 `TOKEN`、`apk/keystore/*.p12`、`/opt/dsh-notify/tls/*key.pem` 提交到 Git 仓库。
 
@@ -58,7 +57,11 @@ ln -sfn /opt/node-v22/bin/npm /usr/local/bin/npm
 node --version   # v22.x
 ```
 
-### 1.3 生成 CA 和服务器证书
+### 1.3 生成服务器证书
+
+1.2.2 不再要求把 CA 内置到 APK。手机第一次连接时会展示服务器**叶子证书**的 SHA-256，
+确认后固定；插件填同一个指纹即可。CA 仍然可以保留，用来签发/轮换服务器证书，或者作为
+插件端的 `caFile` 校验方式。
 
 服务器证书的 SAN 必须包含客户端实际连接使用的地址。本实例用 IP：
 
@@ -66,6 +69,7 @@ node --version   # v22.x
 mkdir -p /opt/dsh-notify/tls
 cd /opt/dsh-notify/tls
 
+# CA 只用于签发服务器证书；私钥永远留在服务器
 openssl genrsa -out ca-key.pem 4096
 openssl req -x509 -new -nodes -key ca-key.pem -sha256 -days 3650 \
   -subj "/CN=DSH Task Notify Cloud CA" -out ca.pem
@@ -82,13 +86,15 @@ openssl x509 -req -in server.csr -CA ca.pem -CAkey ca-key.pem -CAcreateserial \
   -out server.pem -days 3650 -sha256 -extfile server.ext
 
 chmod 600 ca-key.pem server-key.pem
+
+# 记录叶子证书指纹（手机与插件要填同一个值）
+openssl x509 -in server.pem -noout -fingerprint -sha256
 ```
 
-把 **公钥** `ca.pem` 复制到项目 `cloud/certs/ca.pem`，并内置到 App 的
-`apk/res/raw/dsh_cloud_ca.pem`；私钥只留在服务器。
+最后一行输出的 `SHA256 Fingerprint=AB:CD:...` 就是要在手机和 DSH 设置面板里核对的指纹。
 
-如果公网 IP 改变，需要重新生成 `server.pem/server-key.pem`（SAN 改成新 IP），并更新 App 的
-服务器地址；CA 可以继续复用时，App 不需要重新内置 CA。
+如果公网 IP 改变，重新生成 `server.pem/server-key.pem`（SAN 改成新 IP），并在 App 里
+重新确认新指纹。
 
 ### 1.4 安装中继文件
 
@@ -142,13 +148,7 @@ curl --cacert /opt/dsh-notify/tls/ca.pem \
 应返回：
 
 ```json
-{"ok":true,"app":"dsh-task-notify-relay","clients":0,"devices":0,"queued":0}
-```
-
-从公网测试时，CA 文件用项目里的 `cloud/certs/ca.pem`：
-
-```bash
-curl --cacert cloud/certs/ca.pem https://YOUR_SERVER_IP:56159/api/v1/health
+{"ok":true,"app":"dsh-task-notify-relay","devices":0,"clients":0,"queued":0}
 ```
 
 > Windows 自带 `curl.exe` 使用 Schannel，可能不接受 `--cacert`；用 Node/Java 或 WSL 测试更可靠。
@@ -156,30 +156,53 @@ curl --cacert cloud/certs/ca.pem https://YOUR_SERVER_IP:56159/api/v1/health
 ### 1.7 NAT / 防火墙
 
 - 云控制台：外网 TCP 56159 → 内网 TCP 56159
-- 服务器 UFW 可以不启用，但不要额外放行其他端口
+- 服务器本机 UFW 默认拒绝入站，必须显式放行中继端口（否则手机/电脑只会「连接超时」）：
+
+```bash
+ufw allow 56159/tcp
+ufw status | grep 56159
+```
+
 - SSH <SSH_PORT> 只给自己使用
+- 不要把 8787 等内部测试端口暴露到公网
+
+> 如果健康检查在本机通过、外部却超时，先查 `ufw status` 和云厂商安全组，而不是先怀疑证书。
 
 ## 2. 插件配置
 
 ### 2.1 安装
 
 ```powershell
-.\build-apk.cmd   # 只有改 APK 时才需要
-# 插件包在 release\dsh-plugin-task-notify-0.2.0.tgz
+dsh plugin --profile desktop add .\release\dsh-plugin-task-notify-1.2.2.tgz
 ```
 
-Profile 的 `package.json`：
+Profile 的 `package.json` 应包含：
 
 ```json
 "dependencies": {
-  "dsh-plugin-task-notify": "file:vendor/dsh-plugin-task-notify-0.2.0.tgz"
+  "dsh-plugin-task-notify": "file:vendor/dsh-plugin-task-notify-1.2.2.tgz"
 }
 ```
 
-把 tarball 放到 profile 的 `vendor\`，安装到 `node_modules\`，并确认
-`dsh.profile.bundles` 包含 `dsh-plugin-task-notify`。
+并确认 `dsh.profile.bundles` 包含 `dsh-plugin-task-notify`。安装后**重启 DSH**：宿主插件和
+左侧栏面板都在启动时加载。
 
-### 2.2 云端配置
+### 2.2 用左侧栏设置（推荐）
+
+重启后左侧栏出现 **通知** 入口：
+
+1. 云端 → 打开「启用」。
+2. 服务器地址：`https://YOUR_SERVER_IP:56159`（只接受 https）。
+3. 设备 ID：`vivo-v2154a`。
+4. 访问令牌：`/etc/dsh-notify.env` 的 `TOKEN`。
+5. 点「获取指纹」，应与服务器上 `openssl x509 -fingerprint -sha256` 的结果一致。
+6. 点「使用此指纹」→「保存设置」。
+7. 点「发送测试通知」，确认手机收到。
+
+设置保存在 `%USERPROFILE%\.dsh\storages\task-notify\settings.json`，覆盖 patch 中的同名连接
+参数；删除该文件可回到 patch 的值。
+
+### 2.3 用 YAML 配置（可选）
 
 在 profile 的 `cordis.patch.yml` 追加：
 
@@ -191,11 +214,10 @@ Profile 的 `package.json`：
       url: https://YOUR_SERVER_IP:56159
       token: <TOKEN>
       device: vivo-v2154a
-      caFile: C:/path/to/cloud-ca.pem
+      fingerprint: AB:CD:EF:...      # 64 位十六进制，可带冒号
       timeoutMs: 8000
 ```
 
-`caFile` 必须是服务器 `ca.pem` 的本地副本；Windows 路径建议用正斜杠，避免 YAML 转义问题。
 如果只走云端：
 
 ```yaml
@@ -205,31 +227,23 @@ Profile 的 `package.json`：
 
 局域网和云端可以同时开启，任一路成功即视为送达。
 
-### 2.3 重启 DSH
-
-插件在 DSH 启动时加载。安装 0.2.0 后必须**重启一次 DSH**：
-
-- 云端发送
-- `approval/asked` 授权通知
-- `phone_notify` 的 `online` 输出修复
-
-才会由运行中的进程使用。
-
-验证日志：
+### 2.4 验证日志
 
 ```text
 %USERPROFILE%\.dsh\storages\task-notify\plugin.log
 ```
 
-应能看到 `plugin.loaded` 中 `cloud` 字段，以及 `cloud.ok` / `approval.notify`。
+应能看到 `plugin.loaded`（含 `pinned=true`）、`cloud.ok` / `cloud.failed`、`approval.notify`。
 
 ## 3. 手机 App
 
 ### 3.1 安装
 
 ```powershell
-adb install -r release\DSH-Task-Notify-1.2.1.apk
+adb install -r release\DSH-Task-Notify-1.2.2.apk
 ```
+
+> 从 1.2.1 升级：1.2.2 使用新的签名密钥，先卸载旧版再安装（App 内历史与设置会清空）。
 
 允许通知权限；vivo/iQOO 还要设置：
 
@@ -246,7 +260,10 @@ adb install -r release\DSH-Task-Notify-1.2.1.apk
 - 访问令牌：服务器 `/etc/dsh-notify.env` 的 `TOKEN`
 - 保存并重启服务
 
-首页状态卡显示「云端已连接 · YOUR_SERVER_IP」即成功。令牌输入框是密码类型，不会显示明文。
+首次连接会显示「需要确认服务器证书」，核对 SHA-256 与服务器上的一致后点「信任并重连」。
+连接成功后首页显示「云端已连接」。令牌输入框是密码类型，不会显示明文。
+
+![已信任服务器证书（指纹与已保存的一致）](screenshots/cloud-trust.png)
 
 ### 3.3 局域网（可选）
 
@@ -256,8 +273,8 @@ adb install -r release\DSH-Task-Notify-1.2.1.apk
 ## 4. 端到端测试
 
 ```bash
-# 插件侧
-node cloud/test-plugin.mjs   # 需要设置 RELAY_URL/RELAY_TOKEN/RELAY_DEVICE/RELAY_CA
+# 插件侧（需要本地 relay 或线上 relay）
+node cloud/test-plugin.mjs
 ```
 
 或直接在 DSH 中触发一轮任务，然后检查：
@@ -279,29 +296,32 @@ journalctl -u dsh-notify-relay -n 100 --no-pager
 - 健康检查：`/api/v1/health`
 - 不要把 `/var/lib/dsh-notify` 或 `/opt/dsh-notify/tls` 提交到 Git
 
-## 6. 令牌/证书轮换
+## 6. 令牌 / 证书轮换
 
 令牌：
 
 ```bash
 # 修改 /etc/dsh-notify.env 的 TOKEN
 systemctl restart dsh-notify-relay
-# 更新 App 的访问令牌；更新插件的 cloud.token；重启 DSH
+# 在 DSH 左侧栏的「云端 → 访问令牌」和手机 App 里更新
 ```
 
 证书：
 
 ```bash
-# 用新 IP/域名重新生成 server.pem/server-key.pem，保留或重建 CA
-# 若 CA 改变：重新内置 apk/res/raw/dsh_cloud_ca.pem 并重新打包 APK；
-# 插件 caFile 指向新 CA；重启 relay/App/DSH
+# 用新 IP/域名重新生成 server.pem/server-key.pem，保留 CA 也可以
+openssl x509 -in server.pem -noout -fingerprint -sha256
+# 在手机 App 里出现「服务器证书已变化」→ 核对新指纹后重新信任
+# 在 DSH 左侧栏点「获取指纹」→「使用此指纹」→ 保存
 ```
+
+手机和插件必须使用同一个指纹；只更新一边会出现「指纹不匹配」。
 
 ## 7. 新增手机
 
 1. 服务器不需要注册设备，第一次 POST/SSE 会自动创建。
 2. App 填新的设备 ID（字母/数字/点/下划线/短横线，1–64 字符）。
-3. 插件 `cloud.device` 改成同一个 ID。
-4. 重启 App 服务和 DSH。
+3. 插件 `cloud.device`（或在左侧栏改设备 ID）改成同一个值。
+4. 重启 App 服务；DSH 不需要重启。
 
 局域网发现允许多台手机；云端按设备 ID 路由，每台手机一个队列。

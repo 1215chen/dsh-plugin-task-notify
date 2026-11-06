@@ -14,6 +14,7 @@ services.set('sessionTitle', { get: () => ({ title: '云端插件测试' }) });
 const ctx = {
   on: (event, handler, options) => { listener = { handler, options }; },
   get: (name) => services.get(name),
+  inject: () => {},
   effect: (fn) => { const dispose = fn(); return () => { if (typeof dispose === 'function') dispose(); }; },
   logger: { info: () => {}, warn: () => {}, error: () => {} },
 };
@@ -65,7 +66,7 @@ while (Date.now() < deadline) {
     headers: { Authorization: `Bearer ${TOKEN}` },
   });
   const body = await response.json();
-  found = body.messages?.find((entry) => entry.payload?.title === '云端插件测试');
+  found = body.messages?.find((entry) => entry.payload?.status === 'completed' && entry.payload?.title === '云端插件测试');
   approval = body.messages?.find((entry) => entry.payload?.status === 'approval' && entry.payload?.approvalId === 'approval-cloud-test');
   if (found && approval) break;
   await sleep(100);

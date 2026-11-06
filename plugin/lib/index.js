@@ -1,10 +1,14 @@
 /**
  * dsh-plugin-task-notify — host-side phone notification bridge.
  *
- * Watches live turn boundaries on `session/event`, and when a turn ends with a
+ * Watches live turn boundaries on `session/event` and, when a turn ends with a
  * status the profile asked about, POSTs a small JSON notification to a paired
  * Android receiver on the local network. Receivers are found by UDP broadcast
  * (no configuration required) or named explicitly in the profile patch.
+ *
+ * The plugin also serves a small local-only HTTP API for its browser settings
+ * panel (left sidebar entry), and it can talk to a self-hosted HTTPS relay
+ * either through a CA file or through a pinned certificate fingerprint.
  *
  * The plugin has no npm dependencies: it only uses Node built-ins, so it can be
  * installed as a plain profile bundle.
@@ -14,18 +18,19 @@
 import { createSocket } from 'node:dgram';
 import { request as httpRequest } from 'node:http';
 import { request as httpsRequest } from 'node:https';
-import { readFileSync } from 'node:fs';
-import { randomUUID } from 'node:crypto';
-import { networkInterfaces, hostname } from 'node:os';
+import { connect as tlsConnect, checkServerIdentity } from 'node:tls';
+import { createHash, randomUUID } from 'node:crypto';
+import { chmodSync, readFileSync } from 'node:fs';
+import { hostname, networkInterfaces, homedir } from 'node:os';
 import { basename, join } from 'node:path';
-import { homedir } from 'node:os';
 import { appendFile, mkdir, readFile, rename, stat, writeFile } from 'node:fs/promises';
 
 export const name = 'taskNotify';
 export const inject = ['tools'];
 
-const VERSION = '0.2.0';
+const VERSION = '1.2.2';
 const APPROVAL_HEADLINE = '需要授权';
+const SETTINGS_VERSION = 1;
 const HEADLINES = Object.freeze({
   completed: '任务完成',
   error: '任务失败',
@@ -63,6 +68,7 @@ const DEFAULTS = Object.freeze({
   cloud: null,
 });
 const TURN_STATE_LIMIT = 512;
+const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '::1', '[::1]']);
 
 /** Small helper: bounded integer option. */
 function intOption(value, fallback, min, max) {
@@ -83,7 +89,7 @@ function cleanText(value, limit = 200) {
 
 /** Format a duration for the phone notification body. */
 function formatDuration(ms) {
-  if (!Number.isFinite(ms) || ms <= 0) return '不到 1 秒';
+  if (!Number.isFinite(ms) || ms <= 0) return '未知';
   if (ms < 60000) return `${Math.max(1, Math.round(ms / 1000))} 秒`;
   const totalSeconds = Math.round(ms / 1000);
   const minutes = Math.floor(totalSeconds / 60);
@@ -145,18 +151,50 @@ function normalizeDevice(raw, fallbackPort) {
   };
 }
 
-/** Normalize the optional cloud relay block. */
+/** Normalize a certificate fingerprint to lowercase hex without separators. */
+function normalizeFingerprint(value) {
+  const text = String(value ?? '').trim().toLowerCase().replace(/^sha256[:=]\s*/, '');
+  const hex = text.replace(/[^0-9a-f]/g, '');
+  if (hex.length !== 64) return '';
+  return hex;
+}
+
+/** Render a stored fingerprint as colon-separated uppercase pairs. */
+function displayFingerprint(hex) {
+  const normalized = normalizeFingerprint(hex);
+  if (!normalized) return '';
+  return (normalized.match(/.{2}/g) ?? []).join(':').toUpperCase();
+}
+
+/** True when the host part of a URL points at this machine. */
+function isLoopbackUrl(url) {
+  const host = String(url?.hostname ?? '').toLowerCase().replace(/^\[/, '').replace(/\]$/, '');
+  return LOOPBACK_HOSTS.has(host) || host.endsWith('.localhost');
+}
+
+/**
+ * Normalize the optional cloud relay block.
+ *
+ * Plain `http://` is only accepted for a loopback relay (local testing). Every
+ * other relay must be `https://`; secrets never travel over cleartext.
+ */
 function normalizeCloud(raw) {
   if (!raw || typeof raw !== 'object' || raw.enabled === false) return null;
   const url = cleanText(raw.url, 300).replace(/\/+$/, '');
   if (!url) return { error: '缺少云端地址' };
   let parsed;
   try { parsed = new URL(url); } catch { return { error: '云端地址不是合法 URL' }; }
-  if (!/^https?:$/.test(parsed.protocol) || !parsed.hostname) return { error: '云端地址必须是 http(s) URL' };
+  if (!/^https?:$/.test(parsed.protocol) || !parsed.hostname) return { error: '云端地址必须是 https:// 开头的 URL' };
+  if (parsed.protocol === 'http:' && !isLoopbackUrl(parsed)) {
+    return { error: '云端地址必须使用 https://（只有 127.0.0.1 / localhost 允许 http）' };
+  }
   const token = typeof raw.token === 'string' ? raw.token.trim() : '';
   if (!token) return { error: '缺少云端访问令牌' };
   const device = cleanText(raw.device, 64) || 'my-phone';
   if (!/^[A-Za-z0-9._-]{1,64}$/.test(device)) return { error: '云端设备 ID 只能包含字母、数字、点、下划线和短横线' };
+  const fingerprintInput = typeof raw.fingerprint === 'string' ? raw.fingerprint.trim() : '';
+  const fingerprint = normalizeFingerprint(fingerprintInput);
+  if (fingerprintInput && !fingerprint) return { error: '证书指纹必须是 64 位十六进制 SHA-256' };
   const caFile = cleanText(raw.caFile, 1000);
   let ca;
   if (caFile) {
@@ -170,7 +208,9 @@ function normalizeCloud(raw) {
     url,
     token,
     device,
+    fingerprint,
     ca,
+    caFile,
     timeoutMs: intOption(raw.timeoutMs, 8000, 1000, 30000),
     origin: parsed.origin,
     basePath: parsed.pathname.replace(/\/+$/, ''),
@@ -217,6 +257,8 @@ function normalizeConfig(raw) {
       url: input.cloudUrl,
       token: input.cloudToken,
       device: input.cloudDevice,
+      fingerprint: input.cloudFingerprint,
+      caFile: input.cloudCaFile,
       timeoutMs: input.cloudTimeoutMs,
       enabled: input.cloudEnabled,
     } : null);
@@ -345,6 +387,202 @@ function httpJsonUrl(urlString, { method = 'GET', body, token, timeoutMs = 8000,
   });
 }
 
+/** Decode an HTTP/1.1 chunked body, or null while it is still incomplete. */
+function decodeChunkedBody(buffer) {
+  const parts = [];
+  let offset = 0;
+  while (true) {
+    const lineEnd = buffer.indexOf('\r\n', offset);
+    if (lineEnd < 0) return null;
+    const size = Number.parseInt(buffer.subarray(offset, lineEnd).toString('ascii'), 16);
+    if (!Number.isFinite(size)) return null;
+    offset = lineEnd + 2;
+    if (size === 0) {
+      if (buffer.length < offset + 2) return null;
+      return Buffer.concat(parts);
+    }
+    if (buffer.length < offset + size + 2) return null;
+    parts.push(buffer.subarray(offset, offset + size));
+    offset += size + 2;
+  }
+}
+
+/** Parse one HTTP/1.1 response; null means "need more bytes". */
+function parseHttpResponse(buffer, ended = false) {
+  const headerEnd = buffer.indexOf('\r\n\r\n');
+  if (headerEnd < 0) return null;
+  const head = buffer.subarray(0, headerEnd).toString('latin1');
+  const lines = head.split('\r\n');
+  const statusMatch = /^HTTP\/1\.[01]\s+(\d{3})/.exec(lines[0] ?? '');
+  if (!statusMatch) return null;
+  const headers = new Map();
+  for (const line of lines.slice(1)) {
+    const colon = line.indexOf(':');
+    if (colon <= 0) continue;
+    headers.set(line.slice(0, colon).trim().toLowerCase(), line.slice(colon + 1).trim());
+  }
+  const rest = buffer.subarray(headerEnd + 4);
+  let body;
+  if (/chunked/i.test(headers.get('transfer-encoding') ?? '')) {
+    body = decodeChunkedBody(rest);
+    if (body === null) return null;
+  } else if (headers.has('content-length')) {
+    const length = Number.parseInt(headers.get('content-length') ?? '', 10);
+    if (!Number.isFinite(length) || length < 0) return null;
+    if (rest.length < length) {
+      if (!ended) return null;
+      body = rest;
+    } else {
+      body = rest.subarray(0, length);
+    }
+  } else {
+    if (!ended) return null;
+    body = rest;
+  }
+  return { status: Number(statusMatch[1]), text: body.toString('utf8') };
+}
+
+/** Write one HTTP request over an established socket and read the response. */
+function writeHttpOverSocket(socket, head, body, timeoutMs) {
+  return new Promise((resolve, reject) => {
+    let buffer = Buffer.alloc(0);
+    let finished = false;
+    const timer = setTimeout(() => finish(new Error('请求超时')), timeoutMs);
+    function finish(error, value) {
+      if (finished) return;
+      finished = true;
+      clearTimeout(timer);
+      try { socket.destroy(); } catch { /* already gone */ }
+      if (error) reject(error); else resolve(value);
+    }
+    socket.on('data', (chunk) => {
+      buffer = Buffer.concat([buffer, chunk]);
+      if (buffer.length > 1024 * 1024) {
+        finish(new Error('响应过大'));
+        return;
+      }
+      const parsed = parseHttpResponse(buffer);
+      if (parsed) finish(null, parsed);
+    });
+    socket.once('end', () => {
+      const parsed = parseHttpResponse(buffer, true);
+      finish(parsed ? null : new Error('连接被服务器关闭'), parsed);
+    });
+    socket.once('error', (error) => finish(error));
+    socket.once('timeout', () => finish(new Error('请求超时')));
+    socket.setTimeout(timeoutMs);
+    socket.write(head);
+    if (body) socket.write(body);
+  });
+}
+
+/** True when a host is an IP literal, which must not be sent as TLS SNI. */
+function isIpLiteral(host) {
+  return /^\d{1,3}(?:\.\d{1,3}){3}$/.test(host) || host.includes(':');
+}
+
+/**
+ * HTTPS request that verifies a pinned leaf-certificate SHA-256 fingerprint
+ * before any request bytes (and therefore the bearer token) are sent.
+ *
+ * The TLS socket is established by hand, the fingerprint and host name are
+ * checked on `secureConnect`, and only then is the HTTP request written over
+ * that verified socket. The HTTP/1.1 response is parsed here because Node's
+ * `http.request` refuses a socket it did not connect itself.
+ */
+function httpsJsonPinned(target, { method = 'GET', path, body, token, timeoutMs = 8000 } = {}) {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    let socket;
+    const fail = (error) => {
+      if (settled) return;
+      settled = true;
+      try { socket?.destroy(); } catch { /* already gone */ }
+      reject(error);
+    };
+    try {
+      socket = tlsConnect({
+        host: target.host,
+        port: target.port,
+        ...(isIpLiteral(target.host) ? {} : { servername: target.host }),
+        rejectUnauthorized: false,
+        timeout: timeoutMs,
+      });
+    } catch (error) {
+      fail(error);
+      return;
+    }
+    socket.once('error', fail);
+    socket.once('timeout', () => fail(new Error('请求超时')));
+    socket.once('secureConnect', () => {
+      let cert;
+      try { cert = socket.getPeerCertificate(true); } catch { cert = null; }
+      if (!cert || !cert.raw) {
+        fail(Object.assign(new Error('无法读取服务器证书'), { code: 'CERT_MISSING' }));
+        return;
+      }
+      const actual = createHash('sha256').update(cert.raw).digest('hex');
+      if (target.fingerprint && actual !== target.fingerprint) {
+        fail(Object.assign(new Error('服务器证书指纹与已保存的指纹不一致'), {
+          code: 'CERT_FINGERPRINT_MISMATCH',
+          actual,
+          expected: target.fingerprint,
+        }));
+        return;
+      }
+      const hostnameError = checkServerIdentity(target.host, cert);
+      if (hostnameError) {
+        fail(Object.assign(new Error(`证书不包含该地址：${hostnameError.message}`), { code: 'CERT_HOSTNAME' }));
+        return;
+      }
+      const headers = {
+        Accept: 'application/json',
+        Connection: 'close',
+        'User-Agent': `dsh-task-notify/${VERSION}`,
+        Host: target.port === 443 ? target.host : `${target.host}:${target.port}`,
+      };
+      let data;
+      if (body !== undefined) {
+        data = Buffer.from(JSON.stringify(body), 'utf8');
+        headers['Content-Type'] = 'application/json; charset=utf-8';
+        headers['Content-Length'] = String(data.length);
+      }
+      if (token) headers.Authorization = `Bearer ${token}`;
+      const head = [
+        `${method} ${path} HTTP/1.1`,
+        ...Object.entries(headers).map(([name, value]) => `${name}: ${value}`),
+        '',
+        '',
+      ].join('\r\n');
+      writeHttpOverSocket(socket, Buffer.from(head, 'utf8'), data, timeoutMs)
+        .then((response) => {
+          if (settled) return;
+          settled = true;
+          let json;
+          try { json = JSON.parse(response.text); } catch { /* plain body */ }
+          resolve({ status: response.status, text: response.text, json });
+        })
+        .catch(fail);
+    });
+  });
+}
+
+/** Read one JSON file, returning a fallback on any failure. */
+async function readJsonFile(file, fallback = null) {
+  try {
+    return JSON.parse(await readFile(file, 'utf8'));
+  } catch {
+    return fallback;
+  }
+}
+
+/** Write one JSON file through a temp file so readers never see a partial body. */
+async function writeJsonFile(file, value) {
+  const tmp = `${file}.${process.pid}.tmp`;
+  await writeFile(tmp, `${JSON.stringify(value, null, 2)}\n`, { encoding: 'utf8', mode: 0o600 });
+  await rename(tmp, file);
+}
+
 /** Send one UDP datagram without letting a local routing error escape. */
 function sendUdp(socket, payload, port, host) {
   try {
@@ -411,8 +649,8 @@ function discoverDevices(config) {
 /** Human-readable network failure for logs and tool results. */
 function describeError(error, target) {
   const code = String(error?.code ?? '');
-  if (code === 'ECONNREFUSED') return `连接被拒绝（请确认手机 App 的通知服务已启动）`;
-  if (code === 'EHOSTUNREACH' || code === 'ENETUNREACH') return `网络不可达（请确认手机与电脑在同一 Wi-Fi）`;
+  if (code === 'ECONNREFUSED') return '连接被拒绝（请确认手机 App 的通知服务已启动）';
+  if (code === 'EHOSTUNREACH' || code === 'ENETUNREACH') return '网络不可达（请确认手机与电脑在同一 Wi-Fi）';
   if (code === 'ETIMEDOUT' || /超时/.test(String(error?.message))) return `连接超时（${target.host}:${target.port}）`;
   if (code === 'ENOTFOUND') return `找不到主机 ${target.host}`;
   const message = cleanText(error?.message, 120);
@@ -443,6 +681,59 @@ function mergeDevices(...groups) {
   return [...merged.values()];
 }
 
+/** Describe the leaf certificate of a TLS endpoint without trusting it. */
+function probeCertificate(urlString, timeoutMs = 8000) {
+  return new Promise((resolve, reject) => {
+    let url;
+    try { url = new URL(urlString); } catch { reject(new Error('地址不是合法 URL')); return; }
+    if (url.protocol !== 'https:') {
+      reject(new Error('只有 https:// 地址才有证书指纹'));
+      return;
+    }
+    const port = url.port ? Number(url.port) : 443;
+    let socket;
+    let settled = false;
+    const done = (error, value) => {
+      if (settled) return;
+      settled = true;
+      try { socket?.destroy(); } catch { /* already gone */ }
+      if (error) reject(error); else resolve(value);
+    };
+    try {
+      socket = tlsConnect({
+        host: url.hostname,
+        port,
+        ...(isIpLiteral(url.hostname) ? {} : { servername: url.hostname }),
+        rejectUnauthorized: false,
+        timeout: timeoutMs,
+      });
+    } catch (error) {
+      done(error);
+      return;
+    }
+    socket.once('error', (error) => done(error));
+    socket.once('timeout', () => done(new Error('连接超时')));
+    socket.once('secureConnect', () => {
+      try {
+        const cert = socket.getPeerCertificate(true);
+        if (!cert || !cert.raw) throw new Error('服务器没有提供证书');
+        done(null, {
+          url: urlString,
+          fingerprint: createHash('sha256').update(cert.raw).digest('hex'),
+          subject: cert.subject?.CN ?? '',
+          issuer: cert.issuer?.CN ?? '',
+          validFrom: cert.valid_from ?? '',
+          validTo: cert.valid_to ?? '',
+          san: cert.subjectaltname ?? '',
+          selfSigned: cert.issuer?.CN === cert.subject?.CN,
+        });
+      } catch (error) {
+        done(error);
+      }
+    });
+  });
+}
+
 /**
  * Create the notification bridge for one mounted plugin instance.
  * @param {import('@deepseek-ai/cordis').Context} ctx
@@ -453,16 +744,27 @@ function createNotifier(ctx, config) {
   const logFile = join(stateDir, 'plugin.log');
   const devicesFile = join(stateDir, 'devices.json');
   const deliveryFile = join(stateDir, 'last-delivery.json');
+  const settingsFile = join(stateDir, 'settings.json');
   const turns = new Map();
   const lastEndSeq = new Map();
   const lastNotifyAt = new Map();
   const approvalSeen = new Map();
+  const startedAt = Date.now();
   let cache = { at: 0, devices: [] };
   let persistedReady = false;
   let disposed = false;
   let queue = Promise.resolve();
   let queued = 0;
   let startupTimer;
+  let lastDelivery = null;
+  // Editable overrides persisted in settings.json. `hasToken`/`hasCloud` keep
+  // "inherit the profile patch" distinct from "explicitly empty".
+  const overrides = { hasToken: false, token: null, hasCloud: false, cloud: null };
+  const live = {
+    token: config.token,
+    cloud: config.cloud,
+    cloudError: config.cloudError || '',
+  };
 
   const ready = (async () => {
     try {
@@ -477,6 +779,15 @@ function createNotifier(ctx, config) {
           cache = { at: 0, devices: parsed.devices.map((entry) => normalizeDevice(entry, config.port)).filter(Boolean) };
         }
       } catch { /* no cache yet */ }
+      const stored = await readJsonFile(settingsFile, null);
+      if (stored && typeof stored === 'object') {
+        overrides.hasToken = Object.hasOwn(stored, 'token') && stored.token !== null;
+        overrides.token = overrides.hasToken && typeof stored.token === 'string' ? stored.token : null;
+        overrides.hasCloud = Object.hasOwn(stored, 'cloud');
+        overrides.cloud = overrides.hasCloud && stored.cloud && typeof stored.cloud === 'object' ? stored.cloud : null;
+        applySettings(overrides, { persist: false, log: false });
+      }
+      lastDelivery = await readJsonFile(deliveryFile, null);
       persistedReady = true;
     } catch { /* state directory is optional */ }
   })();
@@ -546,73 +857,86 @@ function createNotifier(ctx, config) {
 
   /** Absolute cloud URL for one relay endpoint. */
   function cloudEndpoint(path) {
-    return `${config.cloud.origin}${config.cloud.basePath}${path}`;
+    return `${live.cloud.origin}${live.cloud.basePath}${path}`;
   }
 
   /** Post one payload to the self-hosted cloud relay. */
   async function sendCloud(payload) {
-    const cloud = config.cloud;
+    const cloud = live.cloud;
     if (!cloud) return null;
+    const target = { name: '云端中继', host: cloud.host, port: cloud.port, ok: false, error: '', cloud: true };
     let failure = '';
     for (let attempt = 1; attempt <= config.attempts; attempt++) {
       try {
-        const response = await httpJsonUrl(cloudEndpoint('/api/v1/notify'), {
+        const options = {
           method: 'POST',
           body: { device: cloud.device, payload },
           token: cloud.token,
           timeoutMs: cloud.timeoutMs,
-          ca: cloud.ca,
-        });
+        };
+        const response = cloud.fingerprint
+          ? await httpsJsonPinned(cloud, { ...options, path: `${cloud.basePath}/api/v1/notify` })
+          : await httpJsonUrl(cloudEndpoint('/api/v1/notify'), { ...options, ca: cloud.ca });
         if (response.status >= 200 && response.status < 300 && response.json?.ok !== false) {
-          return {
-            name: '云端中继',
-            host: cloud.host,
-            port: cloud.port,
-            ok: true,
-            error: '',
-            seq: Number.isInteger(response.json?.seq) ? response.json.seq : undefined,
-            cloud: true,
-          };
+          live.cloudError = '';
+          return { ...target, ok: true, seq: Number.isInteger(response.json?.seq) ? response.json.seq : undefined };
         }
-        if (response.status === 401 || response.status === 403) return { name: '云端中继', host: cloud.host, port: cloud.port, ok: false, error: '云端令牌不匹配', cloud: true };
-        if (response.status === 404) return { name: '云端中继', host: cloud.host, port: cloud.port, ok: false, error: '云端地址不正确（404）', cloud: true };
+        if (response.status === 401 || response.status === 403) {
+          failure = '云端令牌不匹配';
+          break;
+        }
+        if (response.status === 404) {
+          failure = '云端地址不正确（404）';
+          break;
+        }
         failure = `云端返回 HTTP ${response.status}`;
         if (response.status < 500) break;
       } catch (error) {
         const code = String(error?.code ?? '');
+        if (code === 'CERT_FINGERPRINT_MISMATCH') {
+          failure = '云端证书指纹不匹配（服务器换了证书，或存在中间人）';
+          break;
+        }
+        if (code === 'CERT_HOSTNAME') {
+          failure = '云端证书不包含这个地址';
+          break;
+        }
         if (code === 'ENOTFOUND') failure = `找不到云端域名 ${cloud.host}`;
         else if (code === 'ECONNREFUSED') failure = '云端拒绝连接（服务未启动或端口不对）';
         else if (code === 'ETIMEDOUT' || /超时/.test(String(error?.message))) failure = '云端连接超时';
-        else if (/certificate|SSL|TLS/i.test(String(error?.message))) failure = '云端 TLS 证书校验失败';
+        else if (/certificate|SSL|TLS|CERT/i.test(String(error?.message))) failure = '云端 TLS 证书校验失败';
         else failure = cleanText(error?.message, 120) || '云端发送失败';
       }
       if (attempt < config.attempts) await new Promise((resolve) => setTimeout(resolve, 250));
     }
-    return { name: '云端中继', host: cloud.host, port: cloud.port, ok: false, error: failure || '云端发送失败', cloud: true };
+    live.cloudError = failure || '云端发送失败';
+    return { ...target, error: live.cloudError };
   }
 
-  /** Check the relay's authenticated ping endpoint for the tool. */
+  /** Check the relay's authenticated ping endpoint for the tool and the panel. */
   async function probeCloud() {
-    const cloud = config.cloud;
+    const cloud = live.cloud;
     if (!cloud) return null;
+    const target = { name: '云端中继', host: cloud.host, port: cloud.port };
     try {
-      const response = await httpJsonUrl(cloudEndpoint('/api/v1/ping'), {
-        token: cloud.token,
-        timeoutMs: Math.min(cloud.timeoutMs, 3000),
-        ca: cloud.ca,
-      });
+      const response = cloud.fingerprint
+        ? await httpsJsonPinned(cloud, { path: `${cloud.basePath}/api/v1/ping`, token: cloud.token, timeoutMs: Math.min(cloud.timeoutMs, 5000) })
+        : await httpJsonUrl(cloudEndpoint('/api/v1/ping'), { token: cloud.token, timeoutMs: Math.min(cloud.timeoutMs, 5000), ca: cloud.ca });
       const online = response.status >= 200 && response.status < 300 && response.json?.ok !== false;
-      return { name: '云端中继', host: cloud.host, port: cloud.port, online, error: online ? '' : `HTTP ${response.status}` };
+      if (online) live.cloudError = '';
+      return { ...target, online, error: online ? '' : `HTTP ${response.status}` };
     } catch (error) {
-      return { name: '云端中继', host: cloud.host, port: cloud.port, online: false, error: cleanText(error?.message, 120) || '云端不可达' };
+      return { ...target, online: false, error: cleanText(error?.message, 120) || '云端不可达' };
     }
   }
 
   /** Deliver one payload to every resolved receiver, with bounded retries. */
   async function deliver(payload) {
+    if (!persistedReady) await ready;
     const targets = await resolveTargets();
-    if (targets.length === 0 && !config.cloud) {
+    if (targets.length === 0 && !live.cloud) {
       const result = { ok: false, sentAt: new Date().toISOString(), payloadId: payload.id, devices: [], message: '未发现手机，也未配置云端中继' };
+      lastDelivery = result;
       writeFile(deliveryFile, `${JSON.stringify(result, null, 2)}\n`, 'utf8').catch(() => {});
       log('warn', 'deliver.no-device', { id: payload.id, status: payload.status });
       return result;
@@ -629,7 +953,7 @@ function createNotifier(ctx, config) {
             path: '/notify',
             method: 'POST',
             body: payload,
-            token: target.token || config.token,
+            token: target.token || live.token,
             timeoutMs: config.timeoutMs,
           });
           if (response.status >= 200 && response.status < 300 && response.json?.ok !== false) {
@@ -656,12 +980,12 @@ function createNotifier(ctx, config) {
         error: delivered ? '' : failure,
       });
     }
-    if (config.cloud) {
+    if (live.cloud) {
       const cloudResult = await sendCloud(payload);
       if (cloudResult) {
         devices.push(cloudResult);
         log(cloudResult.ok ? 'info' : 'warn', cloudResult.ok ? 'cloud.ok' : 'cloud.failed', {
-          device: config.cloud.device,
+          device: live.cloud.device,
           host: cloudResult.host,
           seq: cloudResult.seq,
           error: cloudResult.error,
@@ -671,6 +995,7 @@ function createNotifier(ctx, config) {
     const ok = devices.some((device) => device.ok);
     if (!devices.some((device) => device.ok && !device.cloud)) cache = { at: 0, devices: cache.devices };
     const result = { ok, sentAt: new Date().toISOString(), payloadId: payload.id, status: payload.status, devices };
+    lastDelivery = result;
     writeFile(deliveryFile, `${JSON.stringify(result, null, 2)}\n`, 'utf8').catch(() => {});
     log(ok ? 'info' : 'warn', ok ? 'deliver.ok' : 'deliver.failed', { id: payload.id, status: payload.status, devices });
     return result;
@@ -694,7 +1019,8 @@ function createNotifier(ctx, config) {
   function bodyFor(status, reason, state) {
     if (status === 'completed') {
       if (config.includePreview && state.lastText) return previewText(state.lastText, config.previewChars);
-      return `用时 ${formatDuration(state.durationMs)} · ${state.toolCalls} 次工具调用`;
+      const duration = state.durationMs > 0 ? `用时 ${formatDuration(state.durationMs)}` : '用时未知';
+      return `${duration} · ${state.toolCalls} 次工具调用`;
     }
     if (status === 'error') {
       const failure = reason?.error;
@@ -846,7 +1172,6 @@ function createNotifier(ctx, config) {
         return;
       }
 
-      const status = event.data?.reason?.kind;
       const payload = buildPayload(session, event, state);
       turns.delete(sessionId);
       if (!payload) return;
@@ -869,7 +1194,7 @@ function createNotifier(ctx, config) {
     }
   }
 
-  /** Build a manual/test payload for the tool. */
+  /** Build a manual/test payload for the tool and the settings panel. */
   function manualPayload(title, body, status = 'manual') {
     return {
       v: 1,
@@ -901,7 +1226,7 @@ function createNotifier(ctx, config) {
     const devices = [];
     for (const target of targets) {
       try {
-        const response = await httpJson({ host: target.host, port: target.port, path: '/ping', timeoutMs: Math.min(config.timeoutMs, 2000), token: target.token || config.token });
+        const response = await httpJson({ host: target.host, port: target.port, path: '/ping', timeoutMs: Math.min(config.timeoutMs, 2000), token: target.token || live.token });
         const online = response.status >= 200 && response.status < 300 && response.json?.ok !== false;
         devices.push({
           name: cleanText(response.json?.name, 60) || target.name || target.host,
@@ -914,11 +1239,171 @@ function createNotifier(ctx, config) {
         devices.push({ name: target.name || target.host, host: target.host, port: target.port, online: false, error: describeError(error, target) });
       }
     }
-    if (config.cloud) {
+    if (live.cloud) {
       const cloud = await probeCloud();
       if (cloud) devices.push(cloud);
     }
     return { targets, devices };
+  }
+
+  /**
+   * The editable form state: settings.json overrides the profile patch, and a
+   * missing override inherits the patch value.
+   */
+  function formState() {
+    const token = overrides.hasToken ? (overrides.token ?? '') : config.token;
+    let cloud;
+    if (overrides.hasCloud) {
+      const stored = overrides.cloud && typeof overrides.cloud === 'object' ? overrides.cloud : null;
+      cloud = {
+        enabled: stored ? stored.enabled !== false : false,
+        url: typeof stored?.url === 'string' ? stored.url : '',
+        device: typeof stored?.device === 'string' ? stored.device : 'my-phone',
+        token: typeof stored?.token === 'string' ? stored.token : '',
+        fingerprint: typeof stored?.fingerprint === 'string' ? stored.fingerprint : '',
+        caFile: typeof stored?.caFile === 'string' ? stored.caFile : '',
+      };
+    } else if (config.cloud) {
+      cloud = {
+        enabled: true,
+        url: config.cloud.url,
+        device: config.cloud.device,
+        token: config.cloud.token,
+        fingerprint: config.cloud.fingerprint,
+        caFile: config.cloud.caFile,
+      };
+    } else {
+      cloud = { enabled: false, url: '', device: 'my-phone', token: '', fingerprint: '', caFile: '' };
+    }
+    return { token, cloud };
+  }
+
+  /** Recompute the live delivery config from the form state. */
+  function applySettings(next, options = {}) {
+    if (next && typeof next === 'object') {
+      if (Object.hasOwn(next, 'hasToken')) {
+        overrides.hasToken = next.hasToken === true;
+        overrides.token = typeof next.token === 'string' ? next.token : null;
+      }
+      if (Object.hasOwn(next, 'hasCloud')) {
+        overrides.hasCloud = next.hasCloud === true;
+        overrides.cloud = next.cloud && typeof next.cloud === 'object' ? next.cloud : null;
+      }
+    }
+    const form = formState();
+    live.token = form.token;
+    if (form.cloud.enabled && form.cloud.url && form.cloud.token) {
+      const normalized = normalizeCloud({ ...form.cloud, enabled: true });
+      if (normalized?.error) {
+        live.cloud = null;
+        live.cloudError = normalized.error;
+        if (options.log !== false) log('warn', 'settings.cloud-invalid', { error: normalized.error });
+      } else {
+        live.cloud = normalized;
+        live.cloudError = '';
+      }
+    } else {
+      live.cloud = null;
+      live.cloudError = '';
+    }
+    if (options.persist !== false) {
+      persistSettings().catch(() => {});
+    }
+    return { ok: !live.cloudError, error: live.cloudError };
+  }
+
+  /** Write the editable overrides to settings.json (0600). */
+  function persistSettings() {
+    const payload = { version: SETTINGS_VERSION, token: null };
+    if (overrides.hasToken) payload.token = overrides.token ?? '';
+    if (overrides.hasCloud) {
+      payload.cloud = overrides.cloud ? {
+        enabled: overrides.cloud.enabled !== false,
+        url: overrides.cloud.url ?? '',
+        device: overrides.cloud.device ?? 'my-phone',
+        token: overrides.cloud.token ?? '',
+        fingerprint: overrides.cloud.fingerprint ?? '',
+        caFile: overrides.cloud.caFile ?? '',
+      } : null;
+    }
+    return writeJsonFile(settingsFile, payload).then(() => {
+      try { chmodSync(settingsFile, 0o600); } catch { /* windows: mode is advisory */ }
+    });
+  }
+
+  /** Validate and persist a settings patch coming from the browser panel. */
+  async function saveSettings(input) {
+    if (!input || typeof input !== 'object') return { ok: false, error: '设置内容无效' };
+    const token = typeof input.token === 'string' ? input.token.trim() : '';
+    if (token.length > 256) return { ok: false, error: '局域网令牌最多 256 个字符' };
+    const incoming = input.cloud && typeof input.cloud === 'object' ? input.cloud : {};
+    const enabled = incoming.enabled === true;
+    const url = cleanText(incoming.url, 300).replace(/\/+$/, '');
+    const cloudToken = typeof incoming.token === 'string' ? incoming.token.trim() : '';
+    const device = cleanText(incoming.device, 64) || 'my-phone';
+    const fingerprint = normalizeFingerprint(incoming.fingerprint);
+    const caFile = cleanText(incoming.caFile, 1000);
+    if (enabled) {
+      if (!url) return { ok: false, error: '请填写云端服务器地址' };
+      let parsed;
+      try { parsed = new URL(url); } catch { return { ok: false, error: '云端地址不是合法 URL' }; }
+      if (parsed.protocol !== 'https:' && !isLoopbackUrl(parsed)) {
+        return { ok: false, error: '云端地址必须使用 https://（只有本机回环地址允许 http）' };
+      }
+      if (!cloudToken) return { ok: false, error: '请填写云端访问令牌' };
+      if (!/^[A-Za-z0-9._-]{1,64}$/.test(device)) return { ok: false, error: '设备 ID 只能包含字母、数字、点、下划线和短横线' };
+      if (incoming.fingerprint && !fingerprint) return { ok: false, error: '证书指纹必须是 64 位十六进制' };
+    }
+    const result = applySettings({
+      hasToken: true,
+      token,
+      hasCloud: true,
+      cloud: { enabled, url, device, token: cloudToken, fingerprint, caFile },
+    }, { persist: false });
+    if (!result.ok) return { ok: false, error: result.error };
+    try {
+      await persistSettings();
+    } catch {
+      return { ok: false, error: '设置无法写入磁盘' };
+    }
+    log('info', 'settings.saved', {
+      lanToken: live.token ? 'set' : 'off',
+      cloud: live.cloud ? `${live.cloud.host}:${live.cloud.port}` : 'off',
+      pinned: Boolean(live.cloud?.fingerprint),
+    });
+    return { ok: true };
+  }
+
+  /** The settings panel's read model. */
+  function stateSnapshot() {
+    const form = formState();
+    return {
+      version: VERSION,
+      lan: {
+        token: form.token,
+        port: config.port,
+        discoveryPort: config.discoveryPort,
+        discover: config.discover,
+        configured: config.devices.map((device) => ({ name: device.name, host: device.host, port: device.port })),
+        discovered: cache.devices.map((device) => ({ name: device.name, host: device.host, port: device.port, model: device.model, version: device.version })),
+      },
+      cloud: {
+        enabled: live.cloud !== null,
+        url: form.cloud.url,
+        device: form.cloud.device,
+        token: form.cloud.token,
+        fingerprint: form.cloud.fingerprint,
+        fingerprintDisplay: displayFingerprint(form.cloud.fingerprint),
+        caFile: form.cloud.caFile,
+        error: live.cloudError || '',
+        patchHint: config.cloud ? `${config.cloud.host}:${config.cloud.port}` : '',
+      },
+      runtime: {
+        startedAt: new Date(startedAt).toISOString(),
+        lastDelivery,
+        queueLength: queued,
+      },
+    };
   }
 
   /** The model-facing diagnostic tool. */
@@ -1014,17 +1499,38 @@ function createNotifier(ctx, config) {
   }
 
   return {
+    api: {
+      ready,
+      state: stateSnapshot,
+      saveSettings,
+      test: async () => {
+        const result = await deliver(manualPayload('DSH 通知测试', '这条通知来自 DSH 左侧栏设置面板。', 'test'));
+        return { ok: result.ok, result };
+      },
+      probe: probeTargets,
+      fingerprint: async (url) => {
+        const info = await probeCertificate(cleanText(url, 300));
+        return { ...info, display: displayFingerprint(info.fingerprint) };
+      },
+      settingsFile,
+    },
     start() {
-      log('info', 'plugin.loaded', {
-        version: VERSION,
-        port: config.port,
-        discoveryPort: config.discoveryPort,
-        discover: config.discover,
-        notifyOn: [...config.notifyOn],
-        devices: config.devices.map((device) => `${device.name}@${device.host}:${device.port}`),
-        cloud: config.cloud ? `${config.cloud.host}:${config.cloud.port} device=${config.cloud.device}` : (config.cloudError || null),
-        minDurationMs: config.minDurationMs,
-      });
+      // settings.json is read asynchronously; log after it lands so the line
+      // reports the config actually in use (pinned / token / relay).
+      ready.then(() => {
+        if (disposed) return;
+        log('info', 'plugin.loaded', {
+          version: VERSION,
+          port: config.port,
+          discoveryPort: config.discoveryPort,
+          discover: config.discover,
+          notifyOn: [...config.notifyOn],
+          devices: config.devices.map((device) => `${device.name}@${device.host}:${device.port}`),
+          cloud: live.cloud ? `${live.cloud.host}:${live.cloud.port} device=${live.cloud.device} pinned=${Boolean(live.cloud.fingerprint)}` : (live.cloudError || config.cloudError || null),
+          lanToken: live.token ? 'set' : 'off',
+          minDurationMs: config.minDurationMs,
+        });
+      }).catch(() => {});
       if (config.notifyOnStart) {
         startupTimer = setTimeout(() => {
           if (disposed) return;
@@ -1048,6 +1554,60 @@ function createNotifier(ctx, config) {
   };
 }
 
+/** Read a request body with a hard size limit. */
+function readRequestBody(req, limit = 65536) {
+  return new Promise((resolve, reject) => {
+    let size = 0;
+    const chunks = [];
+    req.on('data', (chunk) => {
+      size += chunk.length;
+      if (size > limit) {
+        reject(new Error('body too large'));
+        req.destroy();
+        return;
+      }
+      chunks.push(chunk);
+    });
+    req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+    req.on('error', reject);
+  });
+}
+
+/** True when the request reached the host over a loopback socket. */
+function isLoopbackRequest(req) {
+  const address = String(req.socket?.remoteAddress ?? '');
+  return address === '127.0.0.1' || address === '::1' || address === '::ffff:127.0.0.1';
+}
+
+/**
+ * Reject a browser request from another origin. The settings routes bypass the
+ * DSH web auth layer (they only trust the peer address), so a page from another
+ * site must not be able to POST a new relay URL and steal the token.
+ */
+function isCrossOriginRequest(req) {
+  const site = String(req.headers?.['sec-fetch-site'] ?? '').toLowerCase();
+  if (site === 'cross-site') return true;
+  const origin = req.headers?.origin;
+  if (typeof origin !== 'string' || origin === '' || origin === 'null') return false;
+  try {
+    return new URL(origin).host !== String(req.headers?.host ?? '');
+  } catch {
+    return true;
+  }
+}
+
+/** Write one JSON response. */
+function sendJson(res, status, value) {
+  const body = Buffer.from(JSON.stringify(value), 'utf8');
+  res.writeHead(status, {
+    'Content-Type': 'application/json; charset=utf-8',
+    'Content-Length': body.length,
+    'Cache-Control': 'no-store',
+    'X-Content-Type-Options': 'nosniff',
+  });
+  res.end(body);
+}
+
 /**
  * Mount the notification bridge into a DSH profile.
  * @param {import('@deepseek-ai/cordis').Context} ctx
@@ -1060,4 +1620,106 @@ export function apply(ctx, rawConfig) {
   notifier.registerTool();
   notifier.start();
   ctx.effect(() => () => notifier.dispose(), 'task-notify.dispose');
+
+  // The settings panel talks to this local-only API. It is registered lazily so
+  // a profile without the web server (headless hosts) keeps working.
+  const mountRoutes = (webCtx) => {
+    const routes = [];
+    const guard = (handler) => async (req, res) => {
+      if (!isLoopbackRequest(req)) {
+        sendJson(res, 403, { ok: false, error: '仅允许在本机访问任务通知设置' });
+        return;
+      }
+      if (isCrossOriginRequest(req)) {
+        sendJson(res, 403, { ok: false, error: '拒绝跨站请求' });
+        return;
+      }
+      try {
+        await handler(req, res);
+      } catch (error) {
+        sendJson(res, 500, { ok: false, error: '内部错误' });
+      }
+    };
+    const register = (path, method, handler) => {
+      try {
+        const dispose = webCtx.webServer.register({
+          kind: 'exact',
+          path,
+          handler: guard(async (req, res) => {
+            if (String(req.method ?? '').toUpperCase() !== method) {
+              sendJson(res, 405, { ok: false, error: 'method not allowed' });
+              return;
+            }
+            await handler(req, res);
+          }),
+        });
+        if (typeof dispose === 'function') routes.push(dispose);
+      } catch { /* route table unavailable */ }
+    };
+
+    register('/dsh-task-notify/state', 'GET', async (_req, res) => {
+      await notifier.api.ready;
+      sendJson(res, 200, { ok: true, editable: true, ...notifier.api.state() });
+    });
+
+    register('/dsh-task-notify/settings', 'POST', async (req, res) => {
+      await notifier.api.ready;
+      let body;
+      try {
+        body = JSON.parse(await readRequestBody(req));
+      } catch {
+        sendJson(res, 400, { ok: false, error: '请求体不是合法 JSON' });
+        return;
+      }
+      const result = await notifier.api.saveSettings(body);
+      if (!result.ok) {
+        sendJson(res, 400, { ok: false, error: result.error });
+        return;
+      }
+      sendJson(res, 200, { ok: true, ...notifier.api.state() });
+    });
+
+    register('/dsh-task-notify/test', 'POST', async (_req, res) => {
+      await notifier.api.ready;
+      const result = await notifier.api.test();
+      sendJson(res, 200, { ok: result.ok, ...result.result });
+    });
+
+    register('/dsh-task-notify/probe', 'POST', async (_req, res) => {
+      await notifier.api.ready;
+      const { devices } = await notifier.api.probe();
+      sendJson(res, 200, { ok: true, devices });
+    });
+
+    register('/dsh-task-notify/fingerprint', 'POST', async (req, res) => {
+      await notifier.api.ready;
+      let body;
+      try {
+        body = JSON.parse(await readRequestBody(req));
+      } catch {
+        sendJson(res, 400, { ok: false, error: '请求体不是合法 JSON' });
+        return;
+      }
+      try {
+        const info = await notifier.api.fingerprint(body?.url);
+        sendJson(res, 200, { ok: true, ...info });
+      } catch (error) {
+        sendJson(res, 400, { ok: false, error: cleanText(error?.message, 200) || '无法读取服务器证书' });
+      }
+    });
+
+    if (typeof webCtx.effect === 'function') {
+      webCtx.effect(() => () => {
+        for (const dispose of routes) {
+          try { dispose(); } catch { /* already disposed */ }
+        }
+      }, 'task-notify.routes');
+    }
+  };
+
+  if (typeof ctx.inject === 'function') {
+    ctx.inject(['webServer'], mountRoutes);
+  } else if (ctx.webServer && typeof ctx.webServer.register === 'function') {
+    mountRoutes(ctx);
+  }
 }

@@ -229,6 +229,11 @@ final class CloudClient {
     }
 
     private static String describe(Exception error) {
+        Throwable cause = error;
+        for (int depth = 0; cause != null && depth < 6; depth++, cause = cause.getCause()) {
+            if (cause instanceof CloudTrust.FingerprintChanged) return "云端证书指纹已变化";
+            if (cause instanceof CloudTrust.UnpinnedCertificate) return "云端证书未信任";
+        }
         if (error instanceof UnknownHostException) return "找不到云端域名";
         if (error instanceof ConnectException) return "云端拒绝连接";
         if (error instanceof SocketTimeoutException) return "云端连接超时";

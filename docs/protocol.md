@@ -40,7 +40,7 @@
   "name": "我的手机",
   "model": "Xiaomi 14",
   "port": 8765,
-  "version": "1.2.1",
+  "version": "1.2.2",
   "time": 1792210832473
 }
 ```
@@ -72,7 +72,7 @@ X-Content-Type-Options: nosniff
 {
   "ok": true,
   "app": "dsh-task-notify",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "name": "我的手机",
   "port": 8765,
   "time": 1792210832473
@@ -139,7 +139,7 @@ X-Content-Type-Options: nosniff
   "time": "2026-10-17T04:20:32.467Z",
   "ts": 1792210832473,
   "app": "dsh",
-  "pluginVersion": "0.2.0"
+  "pluginVersion": "1.2.2"
 }
 ```
 
@@ -236,10 +236,34 @@ GET /api/v1/ping        # 需要 Token
 GET /api/v1/health      # 不需要 Token，仅返回计数
 ```
 
-### 5.4 TLS
+### 5.4 TLS 与证书信任
 
-本实例使用自签名 CA，服务器证书 SAN 为 `IP:YOUR_SERVER_IP`。App 只信任内置的
-`res/raw/dsh_cloud_ca.pem`，插件通过 `cloud.caFile` 指定同一张 CA；不依赖系统 CA 或域名。
+本实例使用自签名证书，服务器证书 SAN 为 `IP:YOUR_SERVER_IP`。两端都不再内置 CA：
+
+- **App**：首次连接时 `CloudTrust` 记录叶子证书的 SHA-256 并拒绝握手，界面展示指纹；
+  用户在 App 里确认后指纹写入 `SharedPreferences`，之后只接受这张证书。指纹变化会以
+  「服务器证书已变化」拒绝，公钥 CA 也不能覆盖已固定的指纹。未固定指纹时按系统信任库校验。
+- **插件**：`cloud.fingerprint` 固定叶子证书 SHA-256，`cloud.caFile` 按 CA 链校验，两者都
+  为空时用系统根证书。指纹模式下插件先完成 TLS 握手并核对指纹/主机名，**然后才发送
+  HTTP 请求**，所以令牌不会发给未验证的服务器。
+
+指纹是叶子证书的 SHA-256，十六进制，可带冒号或 `sha256:` 前缀；手机和插件必须使用同一个值。
+更换服务器证书后两端都要重新确认一次。
+
+### 5.5 本机设置接口（不属于局域网/云端协议）
+
+DSH 左侧栏面板通过宿主插件的回环接口读写设置，只接受 `127.0.0.1` / `::1`：
+
+| 方法 | 路径 | 作用 |
+|---|---|---|
+| GET | `/dsh-task-notify/state` | 配置、设备、最近投递 |
+| POST | `/dsh-task-notify/settings` | 保存局域网令牌与云端配置 |
+| POST | `/dsh-task-notify/test` | 发送测试通知 |
+| POST | `/dsh-task-notify/probe` | 重新发现并检查连接 |
+| POST | `/dsh-task-notify/fingerprint` | 读取 `{"url":"https://..."}` 的证书信息 |
+
+非回环请求返回 403；跨站来源（`Origin` 不同源或 `Sec-Fetch-Site: cross-site`）同样返回 403；方法不匹配返回 405。设置写入
+`$DSH_HOME/storages/task-notify/settings.json`（0600），覆盖 profile patch 的连接参数。
 
 ---
 

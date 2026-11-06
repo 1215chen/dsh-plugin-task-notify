@@ -208,14 +208,21 @@ public final class NotifyService extends Service implements NotifySink {
             broadcastEvent("cloud");
             return;
         }
+        if (!url.startsWith("https://") && !NetworkUtils.isLoopbackUrl(url)) {
+            cloudError = "云端地址必须使用 https://";
+            broadcastEvent("cloud");
+            Log.w(TAG, "refusing cleartext cloud relay: " + url);
+            return;
+        }
+        CloudTrust.configure(store.getCloudFingerprint());
         SSLSocketFactory socketFactory = null;
         if (url.startsWith("https://")) {
             try {
-                socketFactory = CloudTls.socketFactory(this);
+                socketFactory = CloudTrust.socketFactory();
             } catch (Exception error) {
-                cloudError = "云端证书加载失败";
+                cloudError = "云端证书初始化失败";
                 broadcastEvent("cloud");
-                Log.e(TAG, "cloud CA load failed", error);
+                Log.e(TAG, "cloud trust init failed", error);
                 return;
             }
         }

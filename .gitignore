@@ -13,3 +13,5 @@ apk/keystore/
 .env
 cloud/data/
 server-stop.txt
+# signing password kept beside the ignored keystore
+apk/keystore-password.txt

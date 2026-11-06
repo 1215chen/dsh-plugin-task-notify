@@ -4,7 +4,7 @@
 
 <h1 align="center">DSH 任务通知</h1>
 
-<p align="center">把 DSH 的任务完成、失败和授权请求推送到安卓手机</p>
+<p align="center">把 DSH 的任务完成、失败和授权请求推送到安卓手机，并在 DSH 左侧栏里配置</p>
 
 <p align="center">
   <a href="https://github.com/1215chen/dsh-plugin-task-notify/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/1215chen/dsh-plugin-task-notify?label=release&color=2ea043"></a>
@@ -20,7 +20,7 @@
 
 DSH 任务通知是一个**自托管**的手机通知方案：DSH 每轮任务结束、执行失败，或弹出工具授权请求时，把结果推送到安卓手机。
 
-它支持两条通道：
+两条通道可以同时开启：
 
 - **局域网直连**：同一 Wi-Fi 下 UDP 自动发现 + HTTP，无需公网。
 - **云端中继**：通过你自己的 HTTPS 服务器转发，手机和电脑不在同一网络也能收到。
@@ -33,6 +33,7 @@ flowchart LR
   D -->|"Cloud: HTTPS POST"| R["Self-hosted relay"]
   R -->|"SSE stream"| P
   P --> N["Notification + local history"]
+  U["左侧栏「通知」面板"] -.->|"本机回环 HTTP"| D
 ```
 
 ## 功能
@@ -41,11 +42,12 @@ flowchart LR
 |---|---|
 | 任务通知 | 完成、失败、取消、中断、输出上限等回合结束状态 |
 | 授权通知 | 监听 `approval/asked`，标题「需要授权」，正文包含工具名和原因 |
-| 双通道 | 局域网直连和云端中继可同时开启 |
+| 双通道 | 局域网直连和云端中继可同时开启，任一路成功即视为送达 |
+| **左侧栏设置面板** | DSH 左侧栏新增「通知」入口，可直接改局域网令牌、云服务器地址/设备/令牌、证书指纹，并可发送测试通知 |
 | 去重 | 同一 `payload.id` 在 10 分钟窗口内只保留一条通知和一条历史 |
 | 本地历史 | 最近 50 条，点按查看详情，点通知自动定位 |
 | 自托管云端 | 无第三方推送；SSE 断线重连、离线队列、`Last-Event-ID` 补发 |
-| 安全 | 云端 HTTPS + Bearer Token；App 只信任内置 CA，插件固定同一 CA |
+| **证书信任** | 手机按「首次确认指纹」固定服务器证书，不需要重新打包 APK；插件可用指纹或 CA 文件校验同一张证书 |
 
 ## 安装
 
@@ -62,8 +64,8 @@ flowchart LR
 
 从 [Releases](https://github.com/1215chen/dsh-plugin-task-notify/releases/latest) 下载：
 
-- `DSH-Task-Notify-1.2.1.apk`：安卓 App
-- `dsh-plugin-task-notify-0.2.0.tgz`：DSH 插件
+- `DSH-Task-Notify-1.2.2.apk`：安卓 App
+- `dsh-plugin-task-notify-1.2.2.tgz`：DSH 插件
 - `SHA256SUMS.txt`：校验值
 
 ### 2. 安装手机 App
@@ -77,87 +79,54 @@ flowchart LR
 使用 ADB 安装：
 
 ```powershell
-adb install -r release\DSH-Task-Notify-1.2.1.apk
+adb install -r release\DSH-Task-Notify-1.2.2.apk
 ```
+
+> **从 1.2.1 升级**：1.2.2 使用了新的签名密钥，Android 不允许覆盖安装不同签名的 APK。请先卸载旧版（会清空 App 内的历史与设置），再安装 1.2.2。签名密钥与密码在本地 `apk\keystore\` 和 `apk\keystore\password.txt`，已被 `.gitignore` 排除，请自行备份。
 
 ### 3. 安装电脑端插件
 
 ```powershell
-dsh plugin --profile desktop add "$env:USERPROFILE\Downloads\dsh-plugin-task-notify-0.2.0.tgz"
+dsh plugin --profile desktop add "$env:USERPROFILE\Downloads\dsh-plugin-task-notify-1.2.2.tgz"
 ```
 
-也可以在 DSH 的插件页面选择本地的 `dsh-plugin-task-notify-0.2.0.tgz`。
+也可以在 DSH 的插件页面选择本地的 `dsh-plugin-task-notify-1.2.2.tgz`。
 
 安装后确认 profile 的 `package.json` 包含：
 
 ```json
 "dependencies": {
-  "dsh-plugin-task-notify": "file:vendor/dsh-plugin-task-notify-0.2.0.tgz"
+  "dsh-plugin-task-notify": "file:vendor/dsh-plugin-task-notify-1.2.2.tgz"
 }
 ```
 
 并且 `dsh.profile.bundles` 包含 `dsh-plugin-task-notify`。
 
-### 4. 选择连接方式
+### 4. 打开左侧栏设置
 
-#### 局域网（推荐先跑通）
+1. 重启 DSH（插件与它的浏览器端界面只在启动时加载）。
+2. 左侧栏底部会出现 **通知** 入口；点开后是设置页。
+3. 局域网：直接在「局域网」卡片里填访问令牌（可点「生成」）。
+4. 云端：填服务器地址、设备 ID、访问令牌，点「获取指纹」拿到服务器证书的 SHA-256，再点「使用此指纹」并保存。
+5. 保存后立即生效，不需要重启。
 
-1. 手机和电脑连接同一个 Wi-Fi。
-2. 手机 App 保持「接收服务」开启。
-3. 插件默认通过 UDP 8766 自动发现手机，无需填写 IP。
+设置保存在 `%USERPROFILE%\.dsh\storages\task-notify\settings.json`，只在**本机回环地址**可读可写；它覆盖 profile 里的同名配置，删除该文件即可回到 `cordis.patch.yml` 的值。
 
-如果自动发现失败（路由器隔离广播、防火墙拦截或访客网络），在 profile 的
-`cordis.patch.yml` 写死手机地址：
+### 5. 验证
 
-```yaml
-- id: task-notify
-  config:
-    discover: false
-    devices:
-      - host: 192.168.1.23
-        port: 8765
-        name: 我的手机
-```
-
-#### 云端（跨网络）
-
-先按 [完整配置过程](docs/setup.md) 部署中继，然后在 App 和插件里填写同一个设备 ID
-和令牌。
-
-App：**设置 → 云端中继**，填写服务器地址、设备 ID、令牌，保存。
-
-插件 `cordis.patch.yml`：
-
-```yaml
-- id: task-notify
-  config:
-    cloud:
-      url: https://<RELAY_HOST>:<RELAY_PORT>
-      token: <TOKEN>
-      device: my-phone
-      caFile: C:/path/to/cloud-ca.pem
-```
-
-`caFile` 指向部署时生成的 CA 公钥。不要把 token、私钥或 keystore 提交到仓库。
-
-### 5. 重启 DSH 并验证
-
-插件只在 DSH 启动时加载。安装或修改配置后**重启 DSH**。
-
-验证方式：
-
-- 在对话里说：**「用 phone_notify 测试一下手机通知」**
-- 或直接完成一轮任务，检查手机通知和 App「最近通知」
-- 触发一次工具授权，确认收到「需要授权」通知
+- 在设置页点「发送测试通知」，或对助手说：「用 phone_notify 测试一下手机通知」。
+- 完成一轮任务，检查手机通知和 App「最近通知」。
+- 触发一次工具授权，确认收到「需要授权」通知。
 
 ## 云端中继
 
 云端是完全可选的。需要手机和电脑不在同一网络时，可以部署一个单用户中继：
 
 - Node.js + systemd，无 Docker 依赖
-- HTTPS + 自签名 CA（不需要域名，也不需要 80/443）
+- HTTPS + 自签名证书（不需要域名，也不需要 80/443）
 - 每台设备最近 200 条离线队列
-- 手机 App 内置 CA 校验，插件用 `caFile` 固定校验
+- 手机 App 首次连接时固定服务器证书指纹，之后指纹变化会拒绝连接
+- 插件用同一指纹（或 CA 文件）校验中继
 - 同时支持局域网 + 云端，手机端自动去重
 
 部署、证书、令牌轮换和新增手机见：
@@ -167,7 +136,8 @@ App：**设置 → 云端中继**，填写服务器地址、设备 ID、令牌�
 
 ## 界面
 
-- 手机端 APP 设计依照谷歌 Material Design 3 界面设计语言。
+- 手机端 APP 依照谷歌 Material Design 3 界面设计语言。
+- DSH 端新增左侧栏「通知」面板，风格跟随 DSH 主题（深色/浅色）。
 - **通知页**只保留运行状态、接收地址、云端状态和最近通知，没有操作按钮。
 - **设置页**集中所有操作：接收服务、发送测试、电池优化、后台运行、云端中继、
   端口/设备名/令牌、清空记录和关于。
@@ -178,9 +148,9 @@ App：**设置 → 云端中继**，填写服务器地址、设备 ID、令牌�
 
 ```text
 .
-├─ plugin/                DSH 插件源码与配置参考
+├─ plugin/                DSH 插件源码（宿主 lib/index.js + 浏览器 lib/client.js）
 ├─ apk/                   Android 源码、资源、JVM 测试
-├─ cloud/                 云端中继、CA、systemd/Docker 文件
+├─ cloud/                 云端中继、systemd/Docker 配置
 ├─ docs/
 │  ├─ setup.md            从服务器到手机的完整配置过程
 │  ├─ protocol.md         LAN HTTP、云端 SSE、通知 JSON
@@ -194,7 +164,7 @@ App：**设置 → 云端中继**，填写服务器地址、设备 ID、令牌�
 
 需要：
 
-- JDK 17+
+- JDK 17+（脚本显式用 `-encoding UTF-8` 编译源码）
 - Android build-tools 34
 - Android platform 34
 - Node.js 22+
@@ -207,7 +177,7 @@ $env:DSH_KEYSTORE_PASSWORD = "your-keystore-password"
 ```
 
 首次构建会在 `apk\keystore\` 生成本地签名密钥；该目录已被 `.gitignore` 排除。
-APK 输出到 `release\DSH-Task-Notify-1.2.1.apk`。
+APK 输出到 `release\DSH-Task-Notify-1.2.2.apk`。
 
 更详细的构建、测试和签名说明见 [apk/README.md](apk/README.md)。
 
@@ -222,18 +192,19 @@ APK 输出到 `release\DSH-Task-Notify-1.2.1.apk`。
 
 ## 安全
 
-- 局域网默认不校验令牌；在不完全可信的 Wi-Fi 中，请在 App 和插件设置相同的 `token`。
-- 云端使用 HTTPS + Bearer Token；App 只信任内置 CA，插件通过 `caFile` 固定校验。
-- 令牌泄露后，修改服务器 `/etc/dsh-notify.env` 的 `TOKEN`，重启中继，再更新 App 和插件。
+- 局域网默认不校验令牌；在不完全可信的 Wi-Fi 中，请在 App 和左侧栏面板里设置相同的 `token`。
+- 云端只接受 `https://`（只有本机回环地址允许 `http://`）；App 已关闭明文流量。
+- 云端证书：手机首次连接时会展示服务器证书 SHA-256，确认后固定；插件用 `cloud.fingerprint` 或 `cloud.caFile` 校验同一张证书。
+- 令牌泄露后，修改服务器 `/etc/dsh-notify.env` 的 `TOKEN`，重启中继，再在 DSH 左侧栏和 App 里更新。
 - 通知正文可能包含工作内容；可在插件配置中设置 `includePreview: false`。
 
 ## 文档
 
 - [使用说明](使用说明.md) — 安装、配置、故障排查、卸载、测试
-- [完整配置过程](docs/setup.md) — Ubuntu、Node、CA、systemd、NAT、插件、App
+- [完整配置过程](docs/setup.md) — Ubuntu、Node、证书、systemd、NAT、插件、App
 - [云端中继](cloud/README.md) — 运维、证书、队列、令牌
-- [插件配置参考](plugin/README.zh.md) — 全部字段、通知规则、安全
-- [通信协议](docs/protocol.md) — LAN HTTP、云端 SSE、通知 JSON
+- [插件配置参考](plugin/README.zh.md) — 全部字段、通知规则、设置面板、安全
+- [通信协议](docs/protocol.md) — LAN HTTP、云端 SSE、通知 JSON、信任模型
 - [真机测试报告](docs/device-test-report.md) — vivo V2154A / Android 14
 - [安卓工程](apk/README.md) — 源码结构、构建、测试、签名
 
@@ -242,12 +213,15 @@ APK 输出到 `release\DSH-Task-Notify-1.2.1.apk`。
 欢迎提交 Issue 和 Pull Request：
 
 - Bug 请附上系统版本、App 版本、复现步骤和相关日志。
-- 不要提交 token、CA 私钥、签名 keystore、服务器 IP 或本机用户路径。
+- 不要提交 token、证书私钥、签名 keystore、服务器 IP 或本机用户路径。
 - 修改插件或 App 后，请至少跑一遍相关测试：
 
 ```powershell
-# 插件集成测试
+# 插件集成测试（需要先启动 JVM 接收端）
 node apk/test/plugin-integration.mjs
+
+# 设置面板 API 测试（纯 Node）
+node plugin/test/settings-api.mjs
 
 # 云端中继协议测试（需要本地 relay）
 node cloud/test-relay.mjs
@@ -278,11 +252,14 @@ AI 输出可能包含错误、过时信息或不适合生产环境的默认值�
 > maintainer.
 
 Push DSH task completion, failure and **approval requests** to an Android phone. The
-project is self-hosted and has no dependency on FCM, ntfy, an account system or a
-third-party push provider.
+desktop plugin also adds a **Notifications** entry to the DSH left sidebar where the LAN
+token and the cloud relay settings can be edited without touching YAML.
 
 - **LAN**: UDP discovery + HTTP on the same Wi-Fi.
 - **Cloud relay**: HTTPS forwarding through your own server, with SSE and an offline queue.
+- **Certificate trust**: the phone pins the relay's leaf certificate on first use, so a
+  self-hosted relay works with the released APK; the plugin pins the same SHA-256 (or a
+  CA file). Plain `http://` is refused except for loopback testing.
 
 ```mermaid
 flowchart LR
@@ -299,10 +276,11 @@ flowchart LR
 | Task events | Completed, failed, cancelled, interrupted, token limit |
 | Approval | `approval/asked` → “Approval required” with tool name and reason |
 | Dual channel | LAN and cloud can be enabled together |
+| Sidebar settings | LAN token, relay URL/device/token, certificate fingerprint, test notification |
 | Dedupe | The same `payload.id` is delivered once in a 10-minute window |
 | History | Last 50 notifications, tap to view details |
 | Self-hosted cloud | SSE reconnect, offline queue and `Last-Event-ID` replay |
-| Security | HTTPS + Bearer token; App trusts an embedded CA, plugin pins the same CA |
+| Trust | Phone pins the relay certificate; plugin pins the same fingerprint or CA file |
 
 ### Install
 
@@ -313,34 +291,13 @@ flowchart LR
 3. Install the desktop plugin:
 
    ```powershell
-   dsh plugin --profile desktop add "$env:USERPROFILE\Downloads\dsh-plugin-task-notify-0.2.0.tgz"
+   dsh plugin --profile desktop add "$env:USERPROFILE\Downloads\dsh-plugin-task-notify-1.2.2.tgz"
    ```
 
-4. Keep the phone and desktop on the same Wi-Fi for LAN. If UDP discovery is blocked,
-   pin the phone in `cordis.patch.yml`:
-
-   ```yaml
-   - id: task-notify
-     config:
-       discover: false
-       devices:
-         - host: 192.168.1.23
-           port: 8765
-   ```
-
-5. For cloud, configure both sides. App: **Settings → Cloud relay**. Plugin:
-
-   ```yaml
-   - id: task-notify
-     config:
-       cloud:
-         url: https://<RELAY_HOST>:<RELAY_PORT>
-         token: <TOKEN>
-         device: my-phone
-         caFile: C:/path/to/cloud-ca.pem
-   ```
-
-6. Restart DSH. Verify with the `phone_notify` tool or by completing a task.
+4. Restart DSH. The left sidebar now has a **Notifications** entry (通知).
+5. LAN only needs the phone and desktop on the same Wi-Fi. For cloud, fill in the relay
+   URL, device id, token, click **Get fingerprint**, then **Use this fingerprint** and save.
+6. Verify with the **Send test notification** button or the `phone_notify` tool.
 
 Detailed server/CA/token setup: [docs/setup.md](docs/setup.md). Relay operations:
 [cloud/README.md](cloud/README.md).
@@ -354,15 +311,16 @@ $env:DSH_KEYSTORE_PASSWORD = "your-keystore-password"
 .\build-apk.cmd
 ```
 
-The APK is written to `release\DSH-Task-Notify-1.2.1.apk`. The signing key and `_sdk/`
-are git-ignored.
+The APK is written to `release\DSH-Task-Notify-1.2.2.apk`. The signing key and `_sdk/`
+are git-ignored. Version 1.2.2 uses a new signing key, so a 1.2.1 installation must be
+removed first (Android refuses an update signed by a different key).
 
 ### Compatibility and security
 
 - Tested on vivo V2154A / Android 14; other ROMs are not verified.
 - The cloud relay is a single-user service without multi-tenant isolation, auditing or
   rate limiting. Do not expose it to untrusted users.
-- LAN uses an optional shared token. Cloud uses HTTPS + Bearer token and CA pinning.
+- LAN uses an optional shared token. Cloud requires HTTPS and a pinned certificate.
 - Notification bodies can contain work content; set `includePreview: false` if needed.
 - SSE is not FCM: if the OS kills the app, messages are replayed on the next connection.
 
@@ -377,14 +335,13 @@ are git-ignored.
 
 ### AI-generated disclosure
 
-Most of the code, documentation, tests and release notes were generated by AI coding
-assistants. The maintainer owns the requirements, review, real-device testing and fixes.
+Most of the code, documentation, tests and release notes in this project were generated by
+AI coding assistants. The maintainer owns the requirements, review, real-device testing and
+fixes.
 
 AI output can contain mistakes, stale information or unsafe defaults. Review it before
 production use, especially cloud deployment, certificates, tokens, Android signing and
 the security boundary between LAN and cloud.
-
-Issues and pull requests that correct AI-generated content are welcome.
 
 ### License
 

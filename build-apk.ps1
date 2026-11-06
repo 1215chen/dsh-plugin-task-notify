@@ -18,7 +18,7 @@
 
 param(
     [string]$SdkRoot = "_sdk",
-    [string]$Output = "release\DSH-Task-Notify-1.2.1.apk",
+    [string]$Output = "release\DSH-Task-Notify-1.2.2.apk",
     [string]$Keystore = "apk\keystore\dsh-task-notify.p12",
     [string]$StorePassword = $env:DSH_KEYSTORE_PASSWORD
 )
@@ -101,7 +101,7 @@ try {
     Write-Host "==> javac"
     $sources = @(Get-ChildItem "apk\src\com\dsh\tasknotify" -Filter "*.java" |
         ForEach-Object { "apk\src\com\dsh\tasknotify\$($_.Name)" })
-    $javacArgs = @("--release", "8", "-Xlint:-options", "-cp", $androidJarArg, "-d", $classes, $rJava) + $sources
+    $javacArgs = @("--release", "8", "-Xlint:-options", "-encoding", "UTF-8", "-cp", $androidJarArg, "-d", $classes, $rJava) + $sources
     Invoke-Native "javac" $javacArgs
 
     Write-Host "==> strip MethodParameters (d8 34 null-name workaround)"
@@ -129,7 +129,7 @@ try {
             "-dname", "CN=DSH Task Notify, OU=Personal, O=DSH, L=Local, ST=Local, C=CN"
         )
     }
-    $signedRelative = "release\DSH-Task-Notify-1.2.1.apk"
+    $signedRelative = "release\DSH-Task-Notify-1.2.2.apk"
     New-Item -ItemType Directory -Force -Path "release" | Out-Null
     Invoke-Native $apksigner @(
         "sign",

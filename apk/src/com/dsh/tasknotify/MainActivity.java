@@ -21,6 +21,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
+import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -75,6 +76,12 @@ public final class MainActivity extends Activity {
     private EditText cloudUrl;
     private EditText cloudDevice;
     private EditText cloudToken;
+    private View cloudTrustBox;
+    private TextView cloudTrustTitle;
+    private TextView cloudTrustBody;
+    private TextView cloudTrustFp;
+    private Button btnTrustCert;
+    private Button btnForgetCert;
     private EditText inputPort;
     private EditText inputName;
     private EditText inputToken;
@@ -127,6 +134,12 @@ public final class MainActivity extends Activity {
         cloudUrl = findViewById(R.id.cloudUrl);
         cloudDevice = findViewById(R.id.cloudDevice);
         cloudToken = findViewById(R.id.cloudToken);
+        cloudTrustBox = findViewById(R.id.cloudTrustBox);
+        cloudTrustTitle = findViewById(R.id.cloudTrustTitle);
+        cloudTrustBody = findViewById(R.id.cloudTrustBody);
+        cloudTrustFp = findViewById(R.id.cloudTrustFp);
+        btnTrustCert = findViewById(R.id.btnTrustCert);
+        btnForgetCert = findViewById(R.id.btnForgetCert);
         inputPort = findViewById(R.id.inputPort);
         inputName = findViewById(R.id.inputName);
         inputToken = findViewById(R.id.inputToken);
@@ -156,6 +169,8 @@ public final class MainActivity extends Activity {
         findViewById(R.id.btnSave).setOnClickListener(view -> saveSettings());
         findViewById(R.id.btnClear).setOnClickListener(view -> confirmClearHistory());
         findViewById(R.id.btnAbout).setOnClickListener(view -> showAbout());
+        btnTrustCert.setOnClickListener(view -> trustServerCertificate());
+        btnForgetCert.setOnClickListener(view -> forgetServerCertificate());
 
         if (Store.get(this).isEnabled() && !NotifyService.isRunning()) startReceiverService();
         requestNotificationPermission();
@@ -315,6 +330,7 @@ public final class MainActivity extends Activity {
         statusError.setText(error);
 
         renderCloudStatus(store, running);
+        updateTrustUi();
 
         historyCount.setText(entries.size() + " 条");
         rebuildHistory(entries);
@@ -354,6 +370,64 @@ public final class MainActivity extends Activity {
         }
         cloudStatus.setText(text);
         cloudStatus.setTextColor(getColor(color));
+    }
+
+    /**
+     * Show the relay's certificate state: first use needs an explicit confirm,
+     * a changed certificate needs a new decision, and a matching pin is normal.
+     */
+    private void updateTrustUi() {
+        Store store = Store.get(this);
+        String pinned = store.getCloudFingerprint();
+        String seen = CloudTrust.pendingFingerprint();
+        boolean cloudHttps = store.isCloudEnabled()
+                && store.getCloudUrl().toLowerCase(Locale.ROOT).startsWith("https://");
+        if (!cloudHttps || (pinned.isEmpty() && seen.isEmpty())) {
+            cloudTrustBox.setVisibility(View.GONE);
+            return;
+        }
+        cloudTrustBox.setVisibility(View.VISIBLE);
+        if (seen.isEmpty()) {
+            cloudTrustTitle.setText("已信任服务器证书");
+            cloudTrustBody.setText("当前只接受这张证书；服务器换证书后需要重新确认。");
+            cloudTrustFp.setText(CloudTrust.display(pinned));
+        } else if (pinned.isEmpty()) {
+            cloudTrustTitle.setText("需要确认服务器证书");
+            cloudTrustBody.setText("首次连接需要确认指纹。请与电脑端设置面板显示的 SHA-256 核对一致，再点「信任并重连」。");
+            cloudTrustFp.setText(CloudTrust.display(seen));
+        } else if (!pinned.equals(seen)) {
+            cloudTrustTitle.setText("服务器证书已变化");
+            cloudTrustBody.setText("这不是已信任的证书。可能是服务器更换了证书，也可能是中间人；核对无误后再信任。");
+            cloudTrustFp.setText("旧  " + CloudTrust.display(pinned) + "\n\n新  " + CloudTrust.display(seen));
+        } else {
+            cloudTrustTitle.setText("已信任服务器证书");
+            cloudTrustBody.setText("证书指纹与已保存的一致。");
+            cloudTrustFp.setText(CloudTrust.display(pinned));
+        }
+        boolean canTrust = !seen.isEmpty() && !pinned.equals(seen);
+        btnTrustCert.setVisibility(canTrust ? View.VISIBLE : View.GONE);
+        btnTrustCert.setText(pinned.isEmpty() ? "信任并重连" : "信任新证书");
+        btnForgetCert.setVisibility(pinned.isEmpty() ? View.GONE : View.VISIBLE);
+    }
+
+    private void trustServerCertificate() {
+        String fingerprint = CloudTrust.pendingFingerprint();
+        if (fingerprint.isEmpty()) {
+            Toast.makeText(this, "还没有收到服务器证书，请先保存并等待连接", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        Store.get(this).setCloudFingerprint(fingerprint);
+        NotifyService.restart(this);
+        Toast.makeText(this, "已信任该服务器证书，正在重新连接…", Toast.LENGTH_SHORT).show();
+        cloudTrustBox.postDelayed(this::refreshUi, 800);
+    }
+
+    private void forgetServerCertificate() {
+        Store.get(this).setCloudFingerprint("");
+        CloudTrust.clearSeen();
+        NotifyService.restart(this);
+        Toast.makeText(this, "已清除服务器证书信任", Toast.LENGTH_SHORT).show();
+        cloudTrustBox.postDelayed(this::refreshUi, 800);
     }
 
     private void rebuildHistory(List<Store.HistoryEntry> entries) {
@@ -519,7 +593,12 @@ public final class MainActivity extends Activity {
         if (cloudDeviceValue.isEmpty()) cloudDeviceValue = "my-phone";
         if (cloudOn) {
             if (!cloudUrlValue.matches("(?i)^https?://.+")) {
-                cloudUrl.setError("请输入 http:// 或 https:// 开头的地址");
+                cloudUrl.setError("请输入 https:// 开头的地址");
+                return;
+            }
+            if (!cloudUrlValue.toLowerCase(Locale.ROOT).startsWith("https://")
+                    && !NetworkUtils.isLoopbackUrl(cloudUrlValue)) {
+                cloudUrl.setError("云端地址必须使用 https://（本机回环地址除外）");
                 return;
             }
             if (!cloudDeviceValue.matches("[A-Za-z0-9._-]{1,64}")) {
@@ -545,6 +624,8 @@ public final class MainActivity extends Activity {
         store.setCloudToken(cloudTokenValue);
         store.setCloudEnabled(cloudOn);
         store.setEnabled(true);
+        // A new server address invalidates the "seen" certificate until the next handshake.
+        CloudTrust.clearSeen();
         if (NotifyService.isRunning()) NotifyService.restart(this);
         else startReceiverService();
         Toast.makeText(this, "已保存，服务正在重启", Toast.LENGTH_SHORT).show();

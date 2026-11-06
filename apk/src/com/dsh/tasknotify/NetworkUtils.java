@@ -43,4 +43,17 @@ final class NetworkUtils {
         String host = localIpv4();
         return host == null ? null : host + ":" + port;
     }
+
+    /** True for URLs that point back at this device (used only for local testing). */
+    static boolean isLoopbackUrl(String url) {
+        try {
+            String host = new java.net.URL(url).getHost();
+            if (host == null) return false;
+            String normalized = host.toLowerCase(Locale.ROOT);
+            return "localhost".equals(normalized) || "127.0.0.1".equals(normalized)
+                    || "::1".equals(normalized) || "[::1]".equals(normalized);
+        } catch (Exception error) {
+            return false;
+        }
+    }
 }

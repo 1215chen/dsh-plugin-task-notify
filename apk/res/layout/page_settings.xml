@@ -419,11 +419,73 @@
                     android:inputType="textPassword"
                     android:maxLength="128" />
 
+                <LinearLayout
+                    android:id="@+id/cloudTrustBox"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:background="@drawable/bg_surface_container_low"
+                    android:orientation="vertical"
+                    android:padding="14dp"
+                    android:visibility="gone">
+
+                    <TextView
+                        android:id="@+id/cloudTrustTitle"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="服务器证书"
+                        android:textAppearance="@style/TextAppearance.Dsh.LabelMedium" />
+
+                    <TextView
+                        android:id="@+id/cloudTrustBody"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:text="首次连接需要确认服务器证书指纹。"
+                        android:textAppearance="@style/TextAppearance.Dsh.BodySmall" />
+
+                    <TextView
+                        android:id="@+id/cloudTrustFp"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:fontFamily="monospace"
+                        android:textIsSelectable="true"
+                        android:textSize="11sp" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:orientation="horizontal">
+
+                        <Button
+                            android:id="@+id/btnTrustCert"
+                            style="@style/Widget.Dsh.Button"
+                            android:layout_width="0dp"
+                            android:layout_height="44dp"
+                            android:layout_weight="1"
+                            android:background="@drawable/bg_button_filled"
+                            android:text="信任并重连"
+                            android:textColor="@color/on_primary" />
+
+                        <Button
+                            android:id="@+id/btnForgetCert"
+                            style="@style/Widget.Dsh.Button"
+                            android:layout_width="0dp"
+                            android:layout_height="44dp"
+                            android:layout_marginStart="8dp"
+                            android:layout_weight="1"
+                            android:background="@drawable/bg_button_outlined"
+                            android:text="清除信任" />
+                    </LinearLayout>
+                </LinearLayout>
+
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="10dp"
-                    android:text="在 cloud/ 部署中继；设备 ID 和令牌需与插件一致。生产环境必须使用 HTTPS。"
+                    android:text="在 cloud/ 部署中继；设备 ID 和令牌需与插件一致。只接受 https://；首次连接需在下方确认服务器证书指纹。"
                     android:textAppearance="@style/TextAppearance.Dsh.BodySmall" />
             </LinearLayout>
         </LinearLayout>

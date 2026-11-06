@@ -21,6 +21,7 @@ final class Store {
     private static final String KEY_CLOUD_URL = "cloud_url";
     private static final String KEY_CLOUD_DEVICE = "cloud_device";
     private static final String KEY_CLOUD_TOKEN = "cloud_token";
+    private static final String KEY_CLOUD_FINGERPRINT = "cloud_fingerprint";
     private static final String KEY_CLOUD_LAST_EVENT = "cloud_last_event";
     private static final int HISTORY_LIMIT = 50;
 
@@ -104,6 +105,15 @@ final class Store {
 
     void setCloudToken(String token) {
         preferences.edit().putString(KEY_CLOUD_TOKEN, token == null ? "" : token.trim()).apply();
+    }
+
+    /** Pinned relay leaf-certificate SHA-256, lowercase hex; "" means not pinned. */
+    String getCloudFingerprint() {
+        return CloudTrust.normalize(preferences.getString(KEY_CLOUD_FINGERPRINT, ""));
+    }
+
+    void setCloudFingerprint(String fingerprint) {
+        preferences.edit().putString(KEY_CLOUD_FINGERPRINT, CloudTrust.normalize(fingerprint)).apply();
     }
 
     long getCloudLastEventId() {
