@@ -9,7 +9,43 @@ permissions:
   contents: write
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Plugin client and settings tests
+        run: |
+          node plugin/test/client-module.mjs
+          node plugin/test/settings-api.mjs
+
+      - name: Cloud relay and plugin tests
+        env:
+          TOKEN: test-token-123
+          PORT: "8787"
+          HOST: 127.0.0.1
+          DATA_DIR: ${{ runner.temp }}/relay-data
+        run: |
+          node cloud/server.mjs &
+          RELAY_PID=$!
+          for i in $(seq 1 40); do
+            curl -fsS http://127.0.0.1:8787/api/v1/health >/dev/null 2>&1 && break
+            sleep 0.25
+          done
+          RELAY_URL=http://127.0.0.1:8787 RELAY_TOKEN=test-token-123 \
+            RELAY_DEVICE=plugin-cloud-test node cloud/test-relay.mjs
+          RELAY_URL=http://127.0.0.1:8787 RELAY_TOKEN=test-token-123 \
+            RELAY_DEVICE=plugin-cloud-test node cloud/test-plugin.mjs
+          kill $RELAY_PID
+
   release:
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -19,10 +55,14 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            echo "release $GITHUB_REF_NAME already exists; nothing to do"
+            exit 0
+          fi
           gh release create "$GITHUB_REF_NAME" \
             --title "DSH 任务通知 ${GITHUB_REF_NAME#v}" \
             --notes-file .github/release-body.md \
             --latest \
-            release/DSH-Task-Notify-1.2.1.apk \
-            release/dsh-plugin-task-notify-0.2.0.tgz \
+            release/DSH-Task-Notify-1.2.2.apk \
+            release/dsh-plugin-task-notify-1.2.2.tgz \
             release/SHA256SUMS.txt
