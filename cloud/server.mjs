@@ -220,9 +220,13 @@ export function createRelay(options = {}) {
       }
       try { res.write(': ping\n\n'); } catch { cleanup(); }
     }, heartbeatMs);
+    // Only the response socket tells us the SSE client is gone. Since Node 16,
+    // IncomingMessage 'close' means the request message is complete, not that
+    // the connection closed: anything that consumes the request stream (a
+    // middleware calling req.resume(), a future body read) makes it fire while
+    // the stream is still open, which would drop a live client from `clients`.
     res.on('close', cleanup);
     res.on('error', cleanup);
-    req.on('close', cleanup);
     log(`[sse] open device=${device} after=${after} clients=${set.size}`);
   }
 

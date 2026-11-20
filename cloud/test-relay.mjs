@@ -72,8 +72,20 @@ const replay = await openStream(0);
 assert.equal(replay.data.id, 'first');
 console.log('PASS SSE replay', replay.seq);
 
+// Wait for the replay connection to be removed, then make sure a live client
+// stays registered after its request message is complete. `req` close would
+// fire here while the response is still open and silently drop the client.
+for (let attempt = 0; attempt < 60; attempt++) {
+  const snapshot = await fetch(`${BASE}/api/v1/health`).then((response) => response.json());
+  if (snapshot.clients === 0) break;
+  await new Promise((resolve) => setTimeout(resolve, 50));
+}
 const livePromise = openStream(first.body.seq);
-await new Promise((resolve) => setTimeout(resolve, 150));
+await new Promise((resolve) => setTimeout(resolve, 400));
+const liveHealth = await fetch(`${BASE}/api/v1/health`).then((response) => response.json());
+assert.equal(liveHealth.clients, 1, `live SSE client must stay registered, got ${liveHealth.clients}`);
+console.log('PASS SSE client stays registered');
+
 const second = await notify({ v: 1, id: 'second', status: 'error', headline: '任务失败' });
 assert.equal(second.status, 200);
 const live = await livePromise;
