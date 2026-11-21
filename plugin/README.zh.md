@@ -18,7 +18,7 @@ HTTPS 中继转发。插件还在 DSH 左侧栏注册一个「通知」设置面
 电脑端  dsh-plugin-task-notify
         ├─ lib/index.js   宿主：事件监听、发现、投递、本机设置接口
         └─ lib/client.js  浏览器：左侧栏「通知」面板（DSH 客户端模块加载器直接执行）
-手机端  DSH-Task-Notify-1.2.2.apk
+手机端  DSH-Task-Notify-1.2.3.apk
 ```
 
 电脑端只依赖 Node 内置模块；手机端是原生 Android 应用（minSdk 26 / targetSdk 34），
@@ -29,16 +29,16 @@ HTTPS 中继转发。插件还在 DSH 左侧栏注册一个「通知」设置面
 ### 电脑端
 
 ```bash
-dsh plugin --profile desktop add /absolute/path/dsh-plugin-task-notify-1.2.2.tgz
+dsh plugin --profile desktop add /absolute/path/dsh-plugin-task-notify-1.2.3.tgz
 ```
 
-或在 DSH 的 **插件** 页面选择本地的 `dsh-plugin-task-notify-1.2.2.tgz`。插件声明了
+或在 DSH 的 **插件** 页面选择本地的 `dsh-plugin-task-notify-1.2.3.tgz`。插件声明了
 `dsh.bundle.patch` 和 `dsh.client`，安装后会被加入 profile 的 bundle 列表，并在下次启动时
 加载浏览器端面板。
 
 ### 手机端
 
-1. 安装 `DSH-Task-Notify-1.2.2.apk`（从 1.2.1 升级需先卸载旧版，签名不同）。
+1. 安装 `DSH-Task-Notify-1.2.3.apk`（从 1.2.1 升级需先卸载旧版；1.2.2 → 1.2.3 可直接覆盖）。
 2. 打开 App，允许通知权限。
 3. 保持 App 打开一次，让前台服务启动；之后可以退到后台。
 4. 点「发送测试」应能立即看到一条通知。
@@ -196,7 +196,7 @@ dsh plugin --profile desktop add /absolute/path/dsh-plugin-task-notify-1.2.2.tgz
 
 | 现象 | 处理 |
 |---|---|
-| 左侧栏没有「通知」 | 确认插件版本 1.2.2 并重启 DSH；确认 profile bundles 含 `dsh-plugin-task-notify` |
+| 左侧栏没有「通知」 | 确认插件版本 1.2.3 并重启 DSH；确认 profile bundles 含 `dsh-plugin-task-notify` |
 | 面板读不到状态 | 看 `plugin.log`；确认 DSH 有 webServer 服务 |
 | 保存返回 403 | 请用 `127.0.0.1` 访问 DSH；局域网地址只读 |
 | `phone_notify discover` 找不到设备 | 确认手机 App 正在运行、与电脑同一 Wi‑Fi；关闭路由器的 AP 隔离/访客网络；允许 DSH 通过 Windows 防火墙的专用网络 |

@@ -64,8 +64,8 @@ flowchart LR
 
 从 [Releases](https://github.com/1215chen/dsh-plugin-task-notify/releases/latest) 下载：
 
-- `DSH-Task-Notify-1.2.2.apk`：安卓 App
-- `dsh-plugin-task-notify-1.2.2.tgz`：DSH 插件
+- `DSH-Task-Notify-1.2.3.apk`：安卓 App
+- `dsh-plugin-task-notify-1.2.3.tgz`：DSH 插件
 - `SHA256SUMS.txt`：校验值
 
 ### 2. 安装手机 App
@@ -79,24 +79,24 @@ flowchart LR
 使用 ADB 安装：
 
 ```powershell
-adb install -r release\DSH-Task-Notify-1.2.2.apk
+adb install -r release\DSH-Task-Notify-1.2.3.apk
 ```
 
-> **从 1.2.1 升级**：1.2.2 使用了新的签名密钥，Android 不允许覆盖安装不同签名的 APK。请先卸载旧版（会清空 App 内的历史与设置），再安装 1.2.2。签名密钥与密码在本地 `apk\keystore\` 和 `apk\keystore\password.txt`，已被 `.gitignore` 排除，请自行备份。
+> **升级说明**：1.2.2 起使用了新的签名密钥，Android 不允许覆盖安装不同签名的 APK，从 1.2.1 升级请先卸载旧版（会清空 App 内的历史与设置）。1.2.2 → 1.2.3 是同一签名，可直接 `adb install -r` 覆盖安装。签名密钥与密码在本地 `apk\keystore\` 和 `apk\keystore\password.txt`，已被 `.gitignore` 排除，请自行备份。
 
 ### 3. 安装电脑端插件
 
 ```powershell
-dsh plugin --profile desktop add "$env:USERPROFILE\Downloads\dsh-plugin-task-notify-1.2.2.tgz"
+dsh plugin --profile desktop add "$env:USERPROFILE\Downloads\dsh-plugin-task-notify-1.2.3.tgz"
 ```
 
-也可以在 DSH 的插件页面选择本地的 `dsh-plugin-task-notify-1.2.2.tgz`。
+也可以在 DSH 的插件页面选择本地的 `dsh-plugin-task-notify-1.2.3.tgz`。
 
 安装后确认 profile 的 `package.json` 包含：
 
 ```json
 "dependencies": {
-  "dsh-plugin-task-notify": "file:vendor/dsh-plugin-task-notify-1.2.2.tgz"
+  "dsh-plugin-task-notify": "file:vendor/dsh-plugin-task-notify-1.2.3.tgz"
 }
 ```
 
@@ -177,7 +177,7 @@ $env:DSH_KEYSTORE_PASSWORD = "your-keystore-password"
 ```
 
 首次构建会在 `apk\keystore\` 生成本地签名密钥；该目录已被 `.gitignore` 排除。
-APK 输出到 `release\DSH-Task-Notify-1.2.2.apk`。
+APK 输出到 `release\DSH-Task-Notify-1.2.3.apk`。
 
 更详细的构建、测试和签名说明见 [apk/README.md](apk/README.md)。
 
@@ -291,7 +291,7 @@ flowchart LR
 3. Install the desktop plugin:
 
    ```powershell
-   dsh plugin --profile desktop add "$env:USERPROFILE\Downloads\dsh-plugin-task-notify-1.2.2.tgz"
+   dsh plugin --profile desktop add "$env:USERPROFILE\Downloads\dsh-plugin-task-notify-1.2.3.tgz"
    ```
 
 4. Restart DSH. The left sidebar now has a **Notifications** entry (通知).
@@ -311,8 +311,8 @@ $env:DSH_KEYSTORE_PASSWORD = "your-keystore-password"
 .\build-apk.cmd
 ```
 
-The APK is written to `release\DSH-Task-Notify-1.2.2.apk`. The signing key and `_sdk/`
-are git-ignored. Version 1.2.2 uses a new signing key, so a 1.2.1 installation must be
+The APK is written to `release\DSH-Task-Notify-1.2.3.apk`. The signing key and `_sdk/`
+are git-ignored. Version 1.2.3 uses a new signing key, so a 1.2.1 installation must be
 removed first (Android refuses an update signed by a different key).
 
 ### Compatibility and security

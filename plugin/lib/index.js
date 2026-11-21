@@ -28,7 +28,7 @@ import { appendFile, mkdir, readFile, rename, stat, writeFile } from 'node:fs/pr
 export const name = 'taskNotify';
 export const inject = ['tools'];
 
-const VERSION = '1.2.2';
+const VERSION = '1.2.3';
 const APPROVAL_HEADLINE = '需要授权';
 const SETTINGS_VERSION = 1;
 const HEADLINES = Object.freeze({

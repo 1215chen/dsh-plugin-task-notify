@@ -63,6 +63,6 @@ jobs:
             --title "DSH 任务通知 ${GITHUB_REF_NAME#v}" \
             --notes-file .github/release-body.md \
             --latest \
-            release/DSH-Task-Notify-1.2.2.apk \
-            release/dsh-plugin-task-notify-1.2.2.tgz \
+            release/DSH-Task-Notify-1.2.3.apk \
+            release/dsh-plugin-task-notify-1.2.3.tgz \
             release/SHA256SUMS.txt

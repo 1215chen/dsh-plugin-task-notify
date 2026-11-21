@@ -308,7 +308,7 @@ select.dtn-input{appearance:auto}
       return h("div", { className: "dtn-page" }, h("div", { className: "dtn-inner" },
         h("div", { className: "dtn-head" },
           h("h1", { className: "dtn-title" }, "任务通知"),
-          h("span", { className: "dtn-ver" }, `v${state.version || "1.2.2"}`),
+          h("span", { className: "dtn-ver" }, `v${state.version || "1.2.3"}`),
           h("span", { className: "dtn-spacer" }),
           h("button", {
             className: "dtn-btn primary",

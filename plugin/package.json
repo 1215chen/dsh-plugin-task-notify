@@ -1,6 +1,6 @@
 {
   "name": "dsh-plugin-task-notify",
-  "version": "1.2.2",
+  "version": "1.2.3",
   "description": "Push a notification to a paired Android phone when a DSH task turn ends, with a sidebar settings panel.",
   "type": "module",
   "main": "lib/index.js",
