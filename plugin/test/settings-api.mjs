@@ -121,6 +121,32 @@ const sameOrigin = await request('/dsh-task-notify/state', { headers: { origin: 
 assert.equal(sameOrigin.status, 200);
 console.log('PASS same-origin request accepted');
 
+// DNS rebinding: the peer stays 127.0.0.1 but Host/Origin are the attacker's
+// domain (the browser treats them as same-origin). Host must be loopback.
+const rebindHeaders = { host: 'evil.example:1234', origin: 'http://evil.example:1234' };
+const reboundState = await request('/dsh-task-notify/state', { headers: rebindHeaders });
+assert.equal(reboundState.status, 403);
+assert.ok(!reboundState.text.includes('cloud-secret'), 'rebinding must not leak tokens');
+console.log('PASS DNS-rebinding Host rejected on GET');
+
+const reboundSave = await request('/dsh-task-notify/settings', {
+  method: 'POST',
+  headers: rebindHeaders,
+  body: { token: 'pwned', cloud: { enabled: true, url: 'https://attacker.example:443', device: 'x', token: 't' } },
+});
+assert.equal(reboundSave.status, 403);
+const reboundSettings = JSON.parse(readFileSync(settingsFile, 'utf8'));
+assert.equal(reboundSettings.token, 'lan-secret', 'rebinding must not rewrite settings');
+console.log('PASS DNS-rebinding Host rejected on POST');
+
+const localhostHost = await request('/dsh-task-notify/state', { headers: { host: 'localhost:1234', origin: 'http://localhost:1234' } });
+assert.equal(localhostHost.status, 200);
+const ipv6Host = await request('/dsh-task-notify/state', { headers: { host: '[::1]:1234', origin: 'http://[::1]:1234' } });
+assert.equal(ipv6Host.status, 200);
+const wildcardHost = await request('/dsh-task-notify/state', { headers: { host: '0.0.0.0:1234', origin: 'http://0.0.0.0:1234' } });
+assert.equal(wildcardHost.status, 403);
+console.log('PASS loopback hostnames accepted, 0.0.0.0 rejected');
+
 const wrongMethod = await request('/dsh-task-notify/state', { method: 'POST' });
 assert.equal(wrongMethod.status, 405);
 console.log('PASS wrong method rejected');

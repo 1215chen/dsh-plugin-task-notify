@@ -262,7 +262,7 @@ DSH 左侧栏面板通过宿主插件的回环接口读写设置，只接受 `12
 | POST | `/dsh-task-notify/probe` | 重新发现并检查连接 |
 | POST | `/dsh-task-notify/fingerprint` | 读取 `{"url":"https://..."}` 的证书信息 |
 
-非回环请求返回 403；跨站来源（`Origin` 不同源或 `Sec-Fetch-Site: cross-site`）同样返回 403；方法不匹配返回 405。设置写入
+请求必须同时满足：TCP 对端是本机回环地址、`Host` 为 `localhost` / `127.0.0.0/8` / `[::1]`（防 DNS rebinding）、`Origin` 与 `Host` 同源且不是 `Sec-Fetch-Site: cross-site`；任一不满足返回 403，方法不匹配返回 405。设置写入
 `$DSH_HOME/storages/task-notify/settings.json`（0600），覆盖 profile patch 的连接参数。
 
 ---

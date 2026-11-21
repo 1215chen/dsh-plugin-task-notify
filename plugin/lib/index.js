@@ -1579,6 +1579,43 @@ function isLoopbackRequest(req) {
   return address === '127.0.0.1' || address === '::1' || address === '::ffff:127.0.0.1';
 }
 
+/** True when a hostname string names this machine's loopback interface. */
+function isLoopbackHostname(hostname) {
+  const name = String(hostname ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/^\[/, '')
+    .replace(/\]$/, '')
+    .replace(/\.$/, '');
+  if (!name) return false;
+  if (name === 'localhost' || name === '::1' || name === '0:0:0:0:0:0:0:1') return true;
+  if (name.endsWith('.localhost')) return true;
+  const match = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(name);
+  if (!match) return false;
+  const octets = match.slice(1).map((value) => Number(value));
+  return octets.every((value) => value >= 0 && value <= 255) && octets[0] === 127;
+}
+
+/**
+ * Validate the request's Host authority, not just the peer address.
+ *
+ * A DNS-rebinding page keeps the TCP peer at 127.0.0.1 while its own domain
+ * resolves there, so `Host` (and `Origin`, which then matches Host) becomes
+ * `evil.example`. Requiring a loopback Host closes that path: the browser can
+ * only reach these routes on localhost/127.0.0.0-8/[::1].
+ */
+function isLoopbackAuthority(req) {
+  const host = req.headers?.host;
+  if (typeof host !== 'string' || host.trim() === '') return false;
+  let parsed;
+  try {
+    parsed = new URL(`http://${host}`);
+  } catch {
+    return false;
+  }
+  return isLoopbackHostname(parsed.hostname);
+}
+
 /**
  * Reject a browser request from another origin. The settings routes bypass the
  * DSH web auth layer (they only trust the peer address), so a page from another
@@ -1626,7 +1663,7 @@ export function apply(ctx, rawConfig) {
   const mountRoutes = (webCtx) => {
     const routes = [];
     const guard = (handler) => async (req, res) => {
-      if (!isLoopbackRequest(req)) {
+      if (!isLoopbackRequest(req) || !isLoopbackAuthority(req)) {
         sendJson(res, 403, { ok: false, error: '仅允许在本机访问任务通知设置' });
         return;
       }

@@ -166,7 +166,7 @@ dsh plugin --profile desktop add /absolute/path/dsh-plugin-task-notify-1.2.2.tgz
 | POST | `/dsh-task-notify/probe` | 重新发现并检查连接 |
 | POST | `/dsh-task-notify/fingerprint` | 读取 `{"url": "https://..."}` 的证书指纹 |
 
-非回环请求一律 403；跨站来源（`Origin` 不同源或 `Sec-Fetch-Site: cross-site`）也返回 403；方法不匹配返回 405。没有 `webServer` 服务的无头 profile 只提供事件通知
+请求必须同时满足：TCP 对端是本机回环地址、`Host` 是 `localhost` / `127.0.0.0/8` / `[::1]`（防 DNS rebinding）、`Origin` 与 `Host` 同源且不是 `Sec-Fetch-Site: cross-site`；任一不满足返回 403，方法不匹配返回 405。没有 `webServer` 服务的无头 profile 只提供事件通知
 和 `phone_notify` 工具，不注册这些接口。
 
 ## 通知内容
