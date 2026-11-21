@@ -11,7 +11,7 @@ import java.util.Map;
  * oversized notification or arbitrary content.</p>
  */
 final class NotifyPayload {
-    static final String VERSION = "1.2.3";
+    static final String VERSION = "1.2.4";
 
     final String id;
     final String status;

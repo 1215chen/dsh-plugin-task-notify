@@ -1,10 +1,10 @@
 # 真机测试报告
 
-日期：2026-10-17（1.2.1）；2026-11-06 补充 1.2.3 的本机验证
+日期：2026-10-17（1.2.1）；2026-11-06 补充 1.2.4 的本机验证
 设备：vivo V2154A（PD2154），Android 14 / API 34
-APK：`DSH-Task-Notify-1.2.1.apk`（versionCode 4）→ 1.2.2（versionCode 5）→ 1.2.3（versionCode 6）
+APK：`DSH-Task-Notify-1.2.1.apk`（versionCode 4）→ 1.2.2（versionCode 5）→ 1.2.4（versionCode 6）
 说明：网络/通知链路最初在 1.0.0 上验证；1.2.1 增加云端 SSE、自签名 CA、授权通知和 DSH 鲸鱼图标；
-1.2.3 取消内置 CA，改为证书指纹首次确认，并新增 DSH 左侧栏设置面板。
+1.2.2 取消内置 CA，改为证书指纹首次确认，并新增 DSH 左侧栏设置面板。
 电脑：Windows，WLAN `Miwifi`，`192.168.1.100`
 手机：`Miwifi`，`192.168.1.23`（测试中曾自动切到 `huawei-super-wifi-5G` → `192.168.1.24`）
 
@@ -117,7 +117,7 @@ APK：`DSH-Task-Notify-1.2.1.apk`（versionCode 4）→ 1.2.2（versionCode 5）
 | 真机端到端 | 插件（指纹校验）→ relay → 手机 SSE，`delivered … test`，历史 1 条 | 通过 |
 | 防火墙排错 | UFW 未放行 56159 时手机「连接超时」；`ufw allow 56159/tcp` 后恢复 | 已修复并写入文档 |
 
-> 1.2.2 起 APK 使用新的签名密钥，从 1.2.1 升级需要先卸载；1.2.2 → 1.2.3 可直接覆盖安装。卸载后 App 内的历史与设置
+> 1.2.2 起 APK 使用新的签名密钥，从 1.2.1 升级需要先卸载；1.2.2 → 1.2.4 可直接覆盖安装。卸载后 App 内的历史与设置
 > 会清空，需要重新填写局域网令牌与云端配置。
 
 ## 1.2.3 的变更与验证（2026-11-21）
@@ -133,3 +133,14 @@ APK：`DSH-Task-Notify-1.2.1.apk`（versionCode 4）→ 1.2.2（versionCode 5）
 | 升级后接口 | `GET /ping` 返回 `"version":"1.2.3"` | 通过 |
 | 升级后云端 | 原设备 ID/令牌/指纹保留，日志 `cloud relay connected`，首页「云端已连接」 | 通过 |
 | 版本一致性 | 插件、APK、云中继、文档统一 1.2.3 | 通过 |
+
+## 1.2.4 的变更与验证（2026-11-21）
+
+1.2.4 修复 DSH 更新后自动通知全部静默的问题：
+
+| 项 | 方式 | 结果 |
+|---|---|---|
+| 子代理判断 | 不再依赖已移除的 `agents.roots()`，改读 `session.header.delegationDepth` / `options.subagentDepth`；未知形态默认按根会话处理 | 通过 |
+| 回归测试 | 根会话（无 `roots()`，depth 0）必须通知；depth 2 必须抑制 | 8/8 通过 |
+| 真机完成通知 | 修复后日志 `turn.notify` + LAN/云端 `deliver.ok`（relay seq 167） | 通过 |
+| APK 升级 | 1.2.3 → 1.2.4（versionCode 7）覆盖安装，数据保留 | 通过 |

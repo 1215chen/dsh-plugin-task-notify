@@ -128,9 +128,14 @@ async function main() {
     const tool = discoveredHarness.registered.tool;
     const result = await tool.execute({ action: 'discover' });
     assert.equal(result.ok, true, JSON.stringify(result));
-    assert.equal(result.devices.length, 1, JSON.stringify(result.devices));
-    assert.equal(result.devices[0].online, true);
-    assert.equal(result.devices[0].port, PORT);
+    // A multi-homed host (VPN/TUN adapters) can see the same receiver answer
+    // from more than one local address; the meaningful assertion is that the
+    // receiver on the configured port is discovered.
+    const devices = result.devices.filter((device) => device.port === PORT);
+    assert.ok(devices.length >= 1, JSON.stringify(result.devices));
+    const device = devices.find((entry) => !/^(198\.18\.|127\.)/.test(entry.host)) ?? devices[0];
+    assert.equal(device.online, true);
+    assert.equal(device.port, PORT);
     discoveredHarness.disposeAll();
     console.log('PASS UDP discovery through the plugin');
   }
@@ -190,6 +195,40 @@ async function main() {
     assert.equal(after, before, 'subagent turn must not notify');
     console.log('PASS subagent suppression');
     subagentHarness.disposeAll();
+  }
+
+  // 7. Current DSH marks delegation depth on the session header and has no
+  // agents.roots(); a root session must still notify in that shape.
+  {
+    const deepHarness = makeContext();
+    deepHarness.services.set('agents', {
+      get: () => ({ session: { header: { delegationDepth: 2 } } }),
+    });
+    apply(deepHarness.ctx, baseConfig);
+    const before = (await readNotifications()).length;
+    const session = makeSession('session-deep');
+    emit(deepHarness, session, { type: 'turn/start', seq: 40, data: { turn: 1 } });
+    emit(deepHarness, session, { type: 'turn/end', seq: 41, data: { turn: 1, reason: { kind: 'completed' } } });
+    await sleep(600);
+    assert.equal((await readNotifications()).length, before, 'delegationDepth > 0 must not notify');
+    console.log('PASS subagent depth suppression');
+    deepHarness.disposeAll();
+  }
+
+  {
+    const rootHarness = makeContext();
+    rootHarness.services.set('agents', {
+      get: () => ({ session: { header: { delegationDepth: 0 } } }),
+    });
+    apply(rootHarness.ctx, baseConfig);
+    const before = (await readNotifications()).length;
+    const session = makeSession('session-root-depth');
+    emit(rootHarness, session, { type: 'turn/start', seq: 50, data: { turn: 1 } });
+    emit(rootHarness, session, { type: 'turn/end', seq: 51, data: { turn: 1, reason: { kind: 'completed' } } });
+    const after = await waitForCount(before + 1);
+    assert.equal(after.length, before + 1, 'root session must notify even without agents.roots()');
+    console.log('PASS root session notifies without roots()');
+    rootHarness.disposeAll();
   }
 
   harness.disposeAll();

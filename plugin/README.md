@@ -4,7 +4,7 @@ Push a notification to a paired Android phone when a DSH turn ends or a tool ask
 approval. The plugin also adds a **Notifications** panel to the DSH left sidebar, so the LAN
 token and the cloud relay settings can be edited without touching YAML.
 
-The companion Android app (`DSH-Task-Notify-1.2.3.apk`) runs a small LAN receiver and posts a
+The companion Android app (`DSH-Task-Notify-1.2.4.apk`) runs a small LAN receiver and posts a
 high-priority notification. No cloud service, account or third-party push provider is involved.
 
 - Watches live `session/event` turn boundaries and `approval/asked`; ignores subagent turns by default.
@@ -17,7 +17,7 @@ high-priority notification. No cloud service, account or third-party push provid
 ## Install
 
 ```bash
-dsh plugin --profile desktop add /absolute/path/dsh-plugin-task-notify-1.2.3.tgz
+dsh plugin --profile desktop add /absolute/path/dsh-plugin-task-notify-1.2.4.tgz
 ```
 
 The package declares `dsh.bundle.patch` and `dsh.client`, so the desktop profile loads both the

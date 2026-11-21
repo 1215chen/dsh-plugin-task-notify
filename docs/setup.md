@@ -59,7 +59,7 @@ node --version   # v22.x
 
 ### 1.3 生成服务器证书
 
-1.2.3 不再要求把 CA 内置到 APK。手机第一次连接时会展示服务器**叶子证书**的 SHA-256，
+1.2.2 起不再要求把 CA 内置到 APK。手机第一次连接时会展示服务器**叶子证书**的 SHA-256，
 确认后固定；插件填同一个指纹即可。CA 仍然可以保留，用来签发/轮换服务器证书，或者作为
 插件端的 `caFile` 校验方式。
 
@@ -173,14 +173,14 @@ ufw status | grep 56159
 ### 2.1 安装
 
 ```powershell
-dsh plugin --profile desktop add .\release\dsh-plugin-task-notify-1.2.3.tgz
+dsh plugin --profile desktop add .\release\dsh-plugin-task-notify-1.2.4.tgz
 ```
 
 Profile 的 `package.json` 应包含：
 
 ```json
 "dependencies": {
-  "dsh-plugin-task-notify": "file:vendor/dsh-plugin-task-notify-1.2.3.tgz"
+  "dsh-plugin-task-notify": "file:vendor/dsh-plugin-task-notify-1.2.4.tgz"
 }
 ```
 
@@ -240,10 +240,10 @@ Profile 的 `package.json` 应包含：
 ### 3.1 安装
 
 ```powershell
-adb install -r release\DSH-Task-Notify-1.2.3.apk
+adb install -r release\DSH-Task-Notify-1.2.4.apk
 ```
 
-> 从 1.2.1 升级：1.2.2 起使用新的签名密钥，先卸载旧版再安装（App 内历史与设置会清空）。1.2.2 → 1.2.3 是同一签名，可直接覆盖安装。
+> 从 1.2.1 升级：1.2.2 起使用新的签名密钥，先卸载旧版再安装（App 内历史与设置会清空）。1.2.2 → 1.2.4 是同一签名，可直接覆盖安装。
 
 允许通知权限；vivo/iQOO 还要设置：
 

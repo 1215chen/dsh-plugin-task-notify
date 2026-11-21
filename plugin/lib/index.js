@@ -28,7 +28,7 @@ import { appendFile, mkdir, readFile, rename, stat, writeFile } from 'node:fs/pr
 export const name = 'taskNotify';
 export const inject = ['tools'];
 
-const VERSION = '1.2.3';
+const VERSION = '1.2.4';
 const APPROVAL_HEADLINE = '需要授权';
 const SETTINGS_VERSION = 1;
 const HEADLINES = Object.freeze({
@@ -822,7 +822,14 @@ function createNotifier(ctx, config) {
     }
   }
 
-  /** Whether this session belongs to a subagent rather than a user-facing root. */
+  /**
+   * Whether this session belongs to a subagent rather than a user-facing root.
+   *
+   * Current DSH marks delegation depth on `session.header.delegationDepth`
+   * (and `options.subagentDepth` at runtime); an older registry exposed
+   * `agents.roots()`. Never assume "not a root" when the runtime shape is
+   * unknown: a false positive here silently suppresses every notification.
+   */
   function isSubagent(sessionId) {
     if (!config.ignoreSubagents) return false;
     try {
@@ -830,8 +837,18 @@ function createNotifier(ctx, config) {
       if (!agents || typeof agents.get !== 'function') return false;
       const agent = agents.get(sessionId);
       if (!agent) return false;
-      const roots = typeof agents.roots === 'function' ? agents.roots() : [];
-      return !roots.includes(agent);
+      const headerDepth = Number(agent.session?.header?.delegationDepth ?? 0);
+      const runtimeDepth = Number(agent.options?.subagentDepth ?? 0);
+      const depth = Math.max(
+        Number.isFinite(headerDepth) ? headerDepth : 0,
+        Number.isFinite(runtimeDepth) ? runtimeDepth : 0,
+      );
+      if (depth > 0) return true;
+      if (typeof agents.roots === 'function') {
+        const roots = agents.roots();
+        if (Array.isArray(roots) && roots.length > 0) return !roots.includes(agent);
+      }
+      return false;
     } catch {
       return false;
     }
@@ -1118,7 +1135,8 @@ function createNotifier(ctx, config) {
         return;
       }
       if (event.type === 'approval/asked') {
-        if (!config.notifyOnApproval || isSubagent(sessionId)) return;
+        if (!config.notifyOnApproval) return;
+        if (isSubagent(sessionId)) { log('debug', 'approval.subagent-skip', { sessionId }); return; }
         const data = event.data ?? {};
         const approvalId = cleanText(String(data.id ?? ''), 80);
         const key = `${sessionId}:${approvalId || event.seq || Date.now()}`;
@@ -1169,6 +1187,7 @@ function createNotifier(ctx, config) {
       }
       if (isSubagent(sessionId)) {
         turns.delete(sessionId);
+        log('debug', 'turn.subagent-skip', { sessionId });
         return;
       }
 

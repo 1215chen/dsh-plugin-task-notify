@@ -61,7 +61,7 @@ const stateResponse = await request('/dsh-task-notify/state');
 assert.equal(stateResponse.status, 200);
 const state = JSON.parse(stateResponse.text);
 assert.equal(state.ok, true);
-assert.equal(state.version, '1.2.3');
+assert.equal(state.version, '1.2.4');
 assert.equal(state.cloud.enabled, false);
 assert.equal(state.lan.token, '');
 console.log('PASS GET /state');
